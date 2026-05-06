@@ -1,0 +1,2287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="theme-color" content="#0a0b0d"/>
+<title>LexBase — Sistema Jurídico</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Nunito:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="style.css">
+
+  <!-- Google Identity Services + Drive API -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://apis.google.com/js/api.js" async defer></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     LOGIN
+═══════════════════════════════════════════ -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">⚖ LexBase</div>
+    <div class="login-sub">Sistema Jurídico</div>
+    <div class="login-err" id="login-err">Usuário ou senha incorretos.</div>
+    <div class="login-fg">
+      <div class="login-fl">Usuário</div>
+      <input class="login-fi" id="login-user" placeholder="seu@email.com ou usuário" autocomplete="username"/>
+    </div>
+    <div class="login-fg">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <div class="login-fl" style="margin-bottom:0;">Senha</div>
+        <span onclick="openModal('modal-recover-pass')" style="font-size:10.5px;color:rgba(155,85,85,0.85);cursor:pointer;font-weight:600;text-decoration:none;" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Esqueceu a senha?</span>
+      </div>
+      <div style="position:relative;">
+        <input class="login-fi" id="login-pass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:40px;"/>
+        <span onclick="toggleLoginPass()" id="toggle-pass-btn" title="Mostrar/ocultar senha" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:14px;opacity:0.5;user-select:none;">👁</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;margin-bottom:14px;margin-top:2px;">
+      <input type="checkbox" id="remember-me" style="accent-color:#9a6060;width:14px;height:14px;cursor:pointer;"/>
+      <label for="remember-me" style="font-size:11.5px;color:rgba(140,80,80,0.80);cursor:pointer;font-weight:500;">Lembrar meu usuário</label>
+    </div>
+    <button class="login-btn" onclick="doLogin()">Entrar</button>
+    <div class="login-recover"><a href="mailto:tatiani.fabi@live.com?subject=LexBase - Recuperar Senha&body=Olá, preciso recuperar minha senha do LexBase.">Esqueceu a senha?</a></div>
+    <div class="login-hint">Acesso restrito. Contato: tatiani.fabi@live.com</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     APP SHELL
+═══════════════════════════════════════════ -->
+<div class="shell" id="app" style="display:none;">
+  <div class="offline-bar" id="offline-bar">⚠ Modo offline — IA e pesquisa jurídica indisponíveis. Dados locais funcionam normalmente.</div>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="wordmark">LexBase<sup>jur</sup></div>
+    <div class="topbar-right">
+      <div style="position:relative;margin-right:6px;">
+        <input id="global-search" placeholder="🔍 Buscar em tudo..." 
+          style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:5px 14px 5px 14px;color:#fff;font-size:12px;width:180px;outline:none;font-family:'Nunito',sans-serif;"
+          onfocus="this.style.width='240px';showGlobalSearch()" 
+          onblur="setTimeout(function(){hideGlobalSearch()},200);this.style.width='180px'"
+          oninput="runGlobalSearch(this.value)"
+          onkeydown="if(event.key==='Escape')this.blur()"/>
+        <div id="global-search-results" style="display:none;position:absolute;top:36px;right:0;width:320px;background:rgba(255,248,246,0.99);border:1px solid var(--border);border-radius:var(--r2);box-shadow:0 8px 32px rgba(154,96,96,0.20);z-index:9600;max-height:400px;overflow-y:auto;padding:8px 0;"></div>
+      </div>
+      <button onclick="exportBib()" title="Fazer backup agora" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 10px;color:rgba(255,240,235,0.85);font-size:10.5px;font-weight:600;cursor:pointer;font-family:'Nunito',sans-serif;">💾 Backup</button>
+      <div id="gdrive-status" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 12px;cursor:pointer;transition:all .3s;" onclick="toggleGDriveSync()" title="Sincronizar com Google Drive">
+        <div id="gdrive-dot" style="width:8px;height:8px;border-radius:50%;background:rgba(255,240,235,0.40);transition:all .3s;flex-shrink:0;"></div>
+        <span id="gdrive-txt" style="font-size:10.5px;font-weight:700;color:rgba(255,240,235,0.80);font-family:'Nunito',sans-serif;">Drive</span>
+      </div>
+      <div id="status-online" onclick="showOfflineGuide()" title="Clique para ver o que funciona offline" style="display:flex;align-items:center;gap:5px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);border-radius:20px;padding:4px 12px;cursor:pointer;transition:all .3s;">
+        <div id="status-dot" style="width:8px;height:8px;border-radius:50%;background:#5aaa84;box-shadow:0 0 6px rgba(90,170,132,0.8);transition:all .3s;"></div>
+        <span id="status-txt" style="font-size:10.5px;font-weight:700;color:rgba(255,240,235,0.90);font-family:'Nunito',sans-serif;">Online</span>
+      </div>
+      <span class="pill pill-gold" id="pwa-btn" style="cursor:pointer;" onclick="installPWA()">↓ Instalar app</span>
+      <span class="pill pill-gr">✦ IA</span>
+      <span class="pill pill-rd" id="offline-pill">● offline</span>
+      <div class="user-chip" onclick="openModal('modal-user-menu')">
+        <div class="user-avatar" id="top-avatar">T</div>
+        <span class="user-name" id="top-name">Tatiani</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="s-sect">
+      <div class="s-lbl">Principal</div>
+      <div class="s-item on" id="nav-dash" onclick="nav('dash')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        Painel
+      </div>
+      <div class="s-item" id="nav-casos" onclick="nav('casos')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M2 2h5v5H2V2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 2h5v5H9V2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 9h5v5H2V9z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M9 9h5v5H9V9z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        Clientes
+        <span class="s-badge" id="casos-cnt">0</span>
+      </div>
+      <div class="s-item" id="nav-biblioteca" onclick="nav('biblioteca')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="7" y="2" width="4" height="12" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="12" y="5" width="2" height="9" rx="1" stroke="currentColor" stroke-width="1.3"/></svg>
+        Biblioteca
+        <span class="s-badge" id="bib-cnt">0</span>
+      </div>
+      <div class="s-item" id="nav-editor" onclick="nav('editor')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M3 12L3 10L10 3L12 5L5 12L3 12Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><line x1="8" y1="5" x2="10" y2="7" stroke="currentColor" stroke-width="1.3"/></svg>
+        Redigir Peça
+      </div>
+      <div class="s-item" id="nav-intimacoes" onclick="nav('intimacoes')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M2 3h12v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3z" stroke="currentColor" stroke-width="1.3"/><line x1="5" y1="7" x2="11" y2="7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Intimações
+      </div>
+      <div class="s-item" id="nav-importar" onclick="nav('importar')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Importar
+      </div>
+      <div class="s-item" id="nav-pesquisa" onclick="nav('pesquisa')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.3"/><line x1="10.5" y1="10.5" x2="13.5" y2="13.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Pesquisa Jurídica
+      </div>
+      <div class="s-item" id="nav-prazos" onclick="nav('prazos')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Prazos
+        <span class="s-badge alert" id="prazos-alert" style="display:none;">!</span>
+      </div>
+      <div class="s-item" id="nav-agenda" onclick="nav('agenda')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" stroke-width="1.3"/><line x1="5" y1="1" x2="5" y2="5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="11" y1="1" x2="11" y2="5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="2" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.3"/></svg>
+        Agenda
+      </div>
+      <div class="s-item" id="nav-timbrados" onclick="nav('timbrados')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="14" rx="1.5" stroke="currentColor" stroke-width="1.3"/><line x1="5" y1="6" x2="11" y2="6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="5" y1="9" x2="11" y2="9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="5" y1="12" x2="8" y2="12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Visual Law
+      </div>
+      <div class="s-item" id="nav-teses" onclick="nav('teses')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v2H3zM3 7h10v2H3zM3 11h6v2H3z" fill="currentColor" opacity=".6"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M13.5 13.5l1.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Teses
+      </div>
+      <div class="s-item" id="nav-triagem" onclick="nav('triagem')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="13" cy="11" r="2" stroke="currentColor" stroke-width="1.1"/><path d="M14.5 12.5l1 1" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg>
+        Triagem
+      </div>
+      <div class="s-item" id="nav-financeiro" onclick="nav('financeiro')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="9" r="1.5" stroke="currentColor" stroke-width="1.1"/><path d="M5 5V4a1 1 0 011-1h4a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.1"/></svg>
+        Financeiro
+      </div>
+      <div class="s-item" id="nav-admin" onclick="nav('admin')" style="display:none;" id="nav-admin">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L10 6H14L11 9L12 13L8 11L4 13L5 9L2 6H6Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        Administração
+      </div>
+    </div>
+
+    <div class="s-sect">
+      <div class="s-lbl">Áreas</div>
+      <div class="s-item" onclick="filtArea('Direito do Consumidor')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L10 6H14L11 9L12 13L8 11L4 13L5 9L2 6H6L8 2Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        Consumidor
+      </div>
+      <div class="s-item" onclick="filtArea('Direito Bancário')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><rect x="2" y="7" width="12" height="7" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.3"/></svg>
+        Bancário
+      </div>
+      <div class="s-item" onclick="filtArea('Direito Civil')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M8 2L2 5v1h12V5L8 2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><rect x="3" y="6" width="2" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="7" y="6" width="2" height="7" stroke="currentColor" stroke-width="1.2"/><rect x="11" y="6" width="2" height="7" stroke="currentColor" stroke-width="1.2"/></svg>
+        Civil
+      </div>
+      <div class="s-item" onclick="filtArea('Direito de Família')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1.2"/><circle cx="11" cy="5" r="2" stroke="currentColor" stroke-width="1.2"/><path d="M2 13c0-2 1.3-3.5 3-3.5s3 1.5 3 3.5" stroke="currentColor" stroke-width="1.2"/><path d="M8 13c0-2 1.3-3.5 3-3.5s3 1.5 3 3.5" stroke="currentColor" stroke-width="1.2"/></svg>
+        Família
+      </div>
+      <div class="s-item" onclick="filtArea('Direito Trabalhista')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M5 2h6v3H5V2z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path d="M2 5h12v9H2V5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        Trabalhista
+      </div>
+      <div class="s-item" onclick="filtArea('Direito Penal')">
+        <svg class="s-ico" viewBox="0 0 16 16" fill="none"><path d="M8 1L2 4v4c0 4 6 7 6 7s6-3 6-7V4L8 1z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+        Penal
+      </div>
+    </div>
+
+    <div class="s-sect" style="flex:1;">
+      <div class="s-lbl">Pastas</div>
+      <div id="folder-tree"></div>
+      <div class="add-folder" onclick="openModal('modal-pasta')">+ Nova pasta</div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════
+       PAGES
+  ═══════════════════════════════════════ -->
+  <main class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page on" id="page-dash">
+    <div style="
+  position:relative;
+  overflow:hidden;
+  padding:22px 28px 20px;
+  margin-bottom:20px;
+  background:linear-gradient(135deg,rgba(196,144,136,0.18),rgba(216,168,160,0.10));
+  border:1px solid rgba(196,144,136,0.22);
+  border-radius:var(--r3);
+">
+  <!-- Balança invisível / marca d'água -->
+  <svg viewBox="0 0 300 240" xmlns="http://www.w3.org/2000/svg"
+    style="position:absolute;right:-10px;top:50%;transform:translateY(-50%);
+    width:220px;height:auto;opacity:0.07;pointer-events:none;">
+    <g fill="none" stroke="#a05050" stroke-linecap="round" stroke-linejoin="round">
+      <!-- chama -->
+      <ellipse cx="150" cy="14" rx="6" ry="9" stroke-width="3.5"/>
+      <!-- pedestal topo -->
+      <rect x="143" y="22" width="14" height="8" rx="3" stroke-width="3"/>
+      <!-- haste vertical -->
+      <line x1="150" y1="30" x2="150" y2="200" stroke-width="4.5"/>
+      <!-- ornamento central -->
+      <ellipse cx="150" cy="100" rx="10" ry="13" stroke-width="3"/>
+      <rect x="143" y="82" width="14" height="6" rx="3" stroke-width="2.5"/>
+      <rect x="143" y="112" width="14" height="6" rx="3" stroke-width="2.5"/>
+      <!-- barra horizontal -->
+      <path d="M48 72 Q150 58 252 72" stroke-width="5"/>
+      <!-- espirais -->
+      <path d="M48 72 Q39 68 43 61 Q47 54 54 59" stroke-width="3"/>
+      <path d="M252 72 Q261 68 257 61 Q253 54 246 59" stroke-width="3"/>
+      <!-- correntes esquerda -->
+      <line x1="48" y1="72" x2="26" y2="152" stroke-width="2.5"/>
+      <line x1="48" y1="72" x2="70" y2="152" stroke-width="2.5"/>
+      <!-- prato esquerdo -->
+      <path d="M12 156 Q26 147 48 146 Q70 147 84 156 Q70 168 48 169 Q26 168 12 156Z" stroke-width="3.5"/>
+      <!-- correntes direita -->
+      <line x1="252" y1="72" x2="230" y2="152" stroke-width="2.5"/>
+      <line x1="252" y1="72" x2="274" y2="152" stroke-width="2.5"/>
+      <!-- prato direito -->
+      <path d="M216 156 Q230 147 252 146 Q274 147 288 156 Q274 168 252 169 Q230 168 216 156Z" stroke-width="3.5"/>
+      <!-- base -->
+      <ellipse cx="150" cy="196" rx="16" ry="8" stroke-width="3.5"/>
+      <rect x="133" y="201" width="34" height="8" rx="3" stroke-width="3"/>
+      <rect x="122" y="207" width="56" height="11" rx="5" stroke-width="4"/>
+    </g>
+  </svg>
+
+  <!-- Texto saudação -->
+  <div style="position:relative;z-index:1;">
+    <h1 id="dash-greeting" style="
+      font-family:'Cormorant Garamond',serif;
+      font-size:30px;font-weight:700;
+      background:linear-gradient(135deg,#a05050,#c07878,#d4a090);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      background-clip:text;
+      margin-bottom:4px;line-height:1.2;
+    ">Boa tarde, Tatiani</h1>
+    <p id="dash-date" style="font-size:12px;color:var(--text3);font-weight:500;"></p>
+  </div>
+</div>
+    <div class="dash-grid" id="dash-grid">
+      <div class="dash-card dash-card-highlight" onclick="nav('prazos')" style="border-color:rgba(204,80,80,.35);background:linear-gradient(135deg,var(--bg2),rgba(204,80,80,.05));">
+        <div class="dash-icon" style="background:var(--rddim);">⏰</div>
+        <div><div class="dash-title">Prazos Urgentes</div><div class="dash-sub">Próximos 7 dias</div></div>
+        <div class="dash-count" id="dash-prazos-cnt" style="color:var(--rd2);">0</div>
+      </div>
+      <div class="dash-card" onclick="nav('agenda')" style="border-color:rgba(72,136,204,.25);background:linear-gradient(135deg,var(--bg2),rgba(72,136,204,.04));">
+        <div class="dash-icon" style="background:var(--bldim);">📅</div>
+        <div><div class="dash-title">Audiências</div><div class="dash-sub">Este mês</div></div>
+        <div class="dash-count" id="dash-agenda-cnt" style="color:var(--bl2);">0</div>
+      </div>
+      <div class="dash-card" onclick="nav('casos')">
+        <div class="dash-icon" style="background:var(--gdim);">📋</div>
+        <div><div class="dash-title">Casos Ativos</div><div class="dash-sub">Em andamento</div></div>
+        <div class="dash-count" id="dash-casos-cnt">0</div>
+      </div>
+      <div class="dash-card" onclick="nav('biblioteca')">
+        <div class="dash-icon" style="background:var(--pudim);">📚</div>
+        <div><div class="dash-title">Peças</div><div class="dash-sub">Na biblioteca</div></div>
+        <div class="dash-count" id="dash-bib-cnt">0</div>
+      </div>
+    </div>
+    <div class="dash-two">
+      <div class="dash-panel">
+        <div class="dash-panel-title">
+          <span>⏰ Próximos Prazos</span>
+          <button class="btn btn-xs btn-outline" onclick="nav('prazos')">Ver todos</button>
+        </div>
+        <div id="dash-prazos-list"><div style="font-size:11.5px;color:var(--text3);">Nenhum prazo registrado.</div></div>
+
+          <!-- Gráficos dashboard -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px;">
+            <div style="background:rgba(255,248,246,0.88);border:1px solid var(--border);border-radius:var(--r2);padding:14px;">
+              <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:10px;">Casos por área</div>
+              <div id="dash-graf-areas" style="min-height:60px;"></div>
+            </div>
+            <div style="background:rgba(255,248,246,0.88);border:1px solid var(--border);border-radius:var(--r2);padding:14px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                <span style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;">Prazos urgentes</span>
+                <button class="btn btn-xs btn-outline" onclick="requestNotifPermission()" title="Ativar notificações de prazos" style="font-size:9px;">🔔 Notificações</button>
+              </div>
+              <div id="dash-graf-prazos" style="min-height:60px;"></div>
+            </div>
+          </div>
+      </div>
+      <div class="dash-panel">
+        <div class="dash-panel-title">
+          <span>📅 Próximas Audiências</span>
+          <button class="btn btn-xs btn-outline" onclick="nav('agenda')">Ver todas</button>
+        </div>
+        <div id="dash-agenda-list"><div style="font-size:11.5px;color:var(--text3);">Nenhuma audiência registrada.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CASOS -->
+  <div class="page" id="page-casos">
+    <div class="ph">
+      <div class="ph-left"><h1>Clientes</h1><p>Pastas por cliente com ações, peças e documentos</p></div>
+      <div class="ph-acts">
+        <input class="si" id="casos-q" placeholder="🔍 Buscar cliente..." oninput="renderCasos()" style="min-width:170px;"/>
+        <button class="btn btn-gold btn-sm" onclick="openModal('modal-caso')">+ Novo cliente</button>
+      </div>
+    </div>
+    <div id="casos-grid" style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;flex:1;"></div>
+  </div>
+
+  <div class="page" id="page-biblioteca">
+    <div class="ph">
+      <div class="ph-left"><h1>Biblioteca de Peças</h1><p id="bib-sub">Modelos por matéria e tema</p></div>
+      <div class="ph-acts">
+        <input class="si" type="text" id="bib-q" placeholder="🔍 Buscar peça..." oninput="renderBib()" style="min-width:175px;"/>
+        <button class="btn btn-outline btn-sm" onclick="exportBib()">↓ Backup</button>
+        <button class="btn btn-outline btn-sm" onclick="openModal('modal-import-backup')">↑ Restaurar</button>
+        <button class="btn btn-outline btn-sm" onclick="abrirModalNovaPasta()">📁 Nova pasta</button>
+        <button class="btn btn-gold btn-sm" onclick="openNewPeca()">+ Nova peça</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:230px 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
+      <div style="overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding-right:3px;">
+        <div id="bib-folder-all" onclick="selectBibFolder(null)" style="display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:var(--r);cursor:pointer;background:rgba(154,96,96,0.12);border:1px solid rgba(154,96,96,0.22);margin-bottom:6px;">
+          <span style="font-size:15px;">📚</span>
+          <span style="font-size:12px;font-weight:700;color:#6a2020;flex:1;">Todas as peças</span>
+          <span id="bib-cnt-all" style="font-size:10px;background:rgba(154,96,96,0.15);padding:1px 7px;border-radius:10px;color:#9a4040;font-weight:700;">0</span>
+        </div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-weight:700;padding:2px 4px 4px;">Por matéria</div>
+        <div id="bib-areas-list"></div>
+        <div style="height:1px;background:var(--border);margin:7px 0;"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:0 2px;margin-bottom:4px;">
+          <span style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-weight:700;">Pastas personalizadas</span>
+          <button class="btn btn-xs btn-outline" onclick="openModal('modal-pasta')" style="font-size:9px;padding:2px 7px;">+ Nova</button>
+        </div>
+        <div id="bib-pastas-list"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+          <div style="font-size:12px;color:var(--text2);">
+            <span style="cursor:pointer;font-weight:600;color:var(--text);" onclick="selectBibFolder(null)">Biblioteca</span>
+            <span id="bib-breadcrumb"></span>
+          </div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;">
+            <select class="si" id="f-tipo" onchange="renderBib()" style="min-width:150px;">
+              <option value="">Todos os tipos</option>
+              <optgroup label="Defesa"><option>Contestação</option><option>Impugnação</option><option>Contrarrazões</option><option>Manifestação</option><option>Alegações Finais</option></optgroup>
+              <optgroup label="Recursos"><option>Recurso de Apelação</option><option>Recurso Inominado</option><option>Agravo de Instrumento</option><option>Agravo Interno</option><option>Embargos de Declaração</option><option>Recurso Especial (RESP)</option></optgroup>
+              <optgroup label="Inicial/Provas"><option>Petição Inicial</option><option>Especificação de Provas</option><option>Rol de Testemunhas</option></optgroup>
+              <optgroup label="Outros"><option>Petições Diversas</option><option>Contrato</option><option>Distrato</option><option>Parecer</option><option>Outros</option></optgroup>
+            </select>
+            <select class="si" id="f-res" onchange="renderBib()" style="min-width:105px;"><option value="">Todos</option><option>Ganho</option><option>Perda</option><option>Pendente</option></select>
+          </div>
+        </div>
+        <div id="bib-stats-inline" style="font-size:11px;color:var(--text3);"></div>
+        <div style="display:grid;grid-template-columns:1fr 128px 112px 83px 72px;border-bottom:2px solid var(--border2);padding:5px 12px;">
+          <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;">Nome</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;">Tipo</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;">Área</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;">Data</div>
+          <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;">Ações</div>
+        </div>
+        <div id="bib-grid" style="flex:1;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page" id="page-editor" style="padding:16px 20px;">
+    <div class="ph" style="margin-bottom:10px;">
+      <div class="ph-left"><h1>Redigir Petição</h1><p id="editor-caso-info">Nenhum caso vinculado</p></div>
+      <div class="ph-acts">
+        <select class="si" id="editor-timbrado" style="min-width:140px;" onchange="renderEditorTimbrado()"><option value="">Sem timbrado</option></select>
+        <button class="btn btn-outline btn-sm" onclick="openModal('modal-buscar-modelo')">🔍 Usar modelo</button>
+        <button class="btn btn-outline btn-sm" onclick="editorSalvar()">Salvar na biblioteca</button>
+        <button class="btn btn-gold btn-sm" onclick="abrirExportar()">↓ Exportar</button>
+      </div>
+    </div>
+    <div id="editor-wrap">
+      <!-- ESQUERDA: contexto do caso -->
+      <div id="editor-left">
+        <div class="editor-panel">
+          <div class="editor-panel-title">Dados do caso</div>
+          <div class="fg"><label class="fl">Tipo de peça</label>
+            <select class="fi" id="ed-tipo" style="font-size:11.5px;">
+              <option>Contestação</option><option>Petição Inicial</option><option>Recurso de Apelação</option>
+              <option>Agravo de Instrumento</option><option>Agravo Interno</option><option>Embargos de Declaração</option>
+              <option>Impugnação</option><option>Contrarrazões</option><option>Manifestação</option>
+              <option>Petições Diversas</option><option>Contrato</option><option>Distrato</option><option>Parecer</option>
+            </select>
+          </div>
+          <div class="fg"><label class="fl">Vincular ao caso</label>
+            <select class="fi" id="ed-caso" style="font-size:11.5px;" onchange="updateEditorCasoInfo()"><option value="">— Nenhum —</option></select>
+          </div>
+          <div class="fg"><label class="fl">Área</label>
+            <select class="fi" id="ed-area" style="font-size:11.5px;"><option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option><option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option></select>
+          </div>
+          <div class="fg"><label class="fl">Partes</label><input class="fi" id="ed-partes" placeholder="Réu / Autor" style="font-size:11.5px;"/></div>
+        </div>
+        <div class="editor-panel">
+          <div class="editor-panel-title">Alegações da parte contrária</div>
+          <textarea class="fi" id="ed-alegacoes" style="min-height:100px;font-size:11.5px;" placeholder="Cole aqui as alegações da outra parte para contrapor..."></textarea>
+        </div>
+        <div class="editor-panel">
+          <div class="editor-panel-title">Documentos do caso</div>
+          <div id="ed-docs-list"></div>
+          <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('ed-doc-input').click()">+ Arquivo</button>
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('ed-img-input').click()">+ Imagem</button>
+            <input type="file" id="ed-doc-input" multiple style="display:none;" onchange="addEdDocs(event)"/>
+            <input type="file" id="ed-img-input" multiple accept="image/*" style="display:none;" onchange="addEdImgs(event)"/>
+          </div>
+        </div>
+        <div class="editor-panel">
+          <div class="editor-panel-title">Gerar com IA</div>
+          <textarea class="fi" id="ed-ia-prompt" style="min-height:70px;font-size:11.5px;" placeholder="Descreva o que deseja que a IA escreva..."></textarea>
+          <div style="display:flex;gap:5px;margin-top:6px;">
+            <button class="btn btn-gold btn-xs" style="width:100%;" onclick="editorGerarIA()">✦ Gerar</button>
+          </div>
+          <div class="ia-out dim" id="ed-ia-out" style="margin-top:8px;display:none;"></div>
+          <div style="display:flex;gap:5px;margin-top:5px;display:none;" id="ed-ia-acts">
+            <button class="btn btn-xs btn-outline" onclick="editorInserirIA()">Inserir no texto</button>
+            <button class="btn btn-xs btn-outline" onclick="document.getElementById('ed-ia-out').style.display='none';document.getElementById('ed-ia-acts').style.display='none';">✕</button>
+          </div>
+        </div>
+      </div>
+      <!-- CENTRO: editor -->
+      <div id="editor-center">
+        <div id="editor-timbrado-header"></div>
+        <div id="editor-ruler" style="background:rgba(255,248,246,0.97);border:1px solid rgba(180,100,90,0.15);border-bottom:none;padding:4px 10px;display:flex;align-items:center;gap:6px;border-radius:var(--r) var(--r) 0 0;">
+          <span style="font-size:9px;color:var(--text3);font-weight:700;">📏</span>
+          <span style="font-size:9px;color:var(--text3);">Margem E:</span>
+          <button class="tbb" onclick="adjMargin('left',-0.5)" style="padding:1px 6px;font-size:11px;">◀</button>
+          <span id="ruler-lv" style="font-size:10px;color:var(--text2);min-width:28px;text-align:center;">3cm</span>
+          <button class="tbb" onclick="adjMargin('left',0.5)" style="padding:1px 6px;font-size:11px;">▶</button>
+          <div style="flex:1;height:1px;background:var(--border);margin:0 6px;"></div>
+          <span style="font-size:9px;color:var(--text3);">Dir:</span>
+          <button class="tbb" onclick="adjMargin('right',-0.5)" style="padding:1px 6px;font-size:11px;">◀</button>
+          <span id="ruler-rv" style="font-size:10px;color:var(--text2);min-width:28px;text-align:center;">3cm</span>
+          <button class="tbb" onclick="adjMargin('right',0.5)" style="padding:1px 6px;font-size:11px;">▶</button>
+        </div>
+        <div id="editor-toolbar">
+          <button class="tbb" onclick="fmt('bold')" title="Negrito (Ctrl+B)"><b>N</b></button>
+          <button class="tbb" onclick="fmt('italic')" title="Itálico"><i>I</i></button>
+          <button class="tbb" onclick="fmt('underline')" title="Sublinhado"><u>S</u></button>
+          <div class="tb-sep"></div>
+          <button class="tbb" onclick="fmt('justifyLeft')">⬅</button>
+          <button class="tbb" onclick="fmt('justifyCenter')">≡</button>
+          <button class="tbb" onclick="fmt('justifyRight')">➡</button>
+          <button class="tbb" onclick="fmt('justifyFull')">☰</button>
+          <div class="tb-sep"></div>
+          <select class="tbb" id="tb-font" onchange="setFont(this.value)" style="cursor:pointer;min-width:110px;">
+            <option value="">Fonte...</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Arial">Arial</option>
+            <option value="Calibri">Calibri</option>
+            <option value="Garamond">Garamond</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+          <select class="tbb" onchange="setFontSz(this.value);this.value=''" style="cursor:pointer;min-width:58px;">
+            <option value="">Tam.</option>
+            <option value="12px">9pt</option><option value="14px">10pt</option>
+            <option value="16px">12pt</option><option value="19px">14pt</option>
+            <option value="22px">16pt</option><option value="28px">20pt</option>
+          </select>
+          <div class="tb-sep"></div>
+          <label title="Cor da fonte" style="display:flex;align-items:center;gap:2px;cursor:pointer;font-size:10px;color:var(--text2);">
+            <b>A</b><input type="color" id="tb-fc" value="#281414" onchange="setFontColor(this.value)" style="width:20px;height:18px;border:none;background:none;cursor:pointer;padding:0;"/>
+          </label>
+          <div class="tb-sep"></div>
+          <button class="tbb" onclick="openBuscaModelos()" title="Buscar modelo no banco de dados" style="color:var(--gold);font-weight:700;">🔍 Modelo</button>
+          <button class="tbb" onclick="insertHR()">—</button>
+          <button class="tbb" onclick="insertDate()" title="Data">📅</button>
+          <button class="tbb" onclick="document.getElementById('ed-img-inp').click()" title="Imagem">🖼</button>
+          <div class="tb-sep"></div>
+          <button class="tbb" onclick="showIAPopup()" style="color:#9a4040;font-weight:700;background:rgba(154,96,96,0.08);border:1px solid rgba(154,96,96,0.20);">✦ IA</button>
+        </div>
+        <div id="editor-body" contenteditable="true"
+          data-placeholder="Clique aqui e comece a digitar a petição. Ou arraste um arquivo/imagem. Selecione texto e clique ✦ IA para opções de reescrita."
+          onmouseup="onEditorMouseUp()" onkeyup="updateWordCount()"
+          ondragover="editorDragOver(event)" ondrop="editorDrop(event)" ondragleave="editorDragLeave(event)">
+        </div>
+        <div class="editor-statusbar">
+          <span class="editor-word-count" id="word-count">0 palavras</span>
+          <span style="font-size:10.5px;color:var(--text3);" id="editor-save-hint">Ctrl+S para salvar</span>
+        </div>
+      </div>
+      <!-- DIREITA: jurisprudência rápida -->
+      <div id="editor-right">
+        <div class="ia-panel">
+          <div class="ia-panel-title"><span class="ia-dot"></span>Pesquisa Rápida</div>
+          <input class="fi" id="ed-pesq-q" placeholder="Buscar juris..." style="font-size:11.5px;margin-bottom:6px;" onkeydown="if(event.key==='Enter')editorPesquisar()"/>
+          <button class="btn btn-gold btn-xs" style="width:100%;margin-bottom:8px;" onclick="editorPesquisar()">Pesquisar</button>
+          <div id="ed-pesq-res" style="font-size:11px;color:var(--text3);">Digite um tema e pesquise.</div>
+        </div>
+        <div class="ia-panel">
+          <div class="ia-panel-title"><span class="ia-dot" style="background:var(--bl2);"></span>Memória do Caso</div>
+          <div id="ed-caso-memoria" style="font-size:11px;color:var(--text3);">Selecione um caso para ver o histórico.</div>
+        </div>
+      </div>
+    </div>
+    <input type="file" id="editor-img-insert" accept="image/*" style="display:none;" onchange="onEditorImgInsert(event)"/>
+  </div>
+
+  <!-- INTIMAÇÕES -->
+  <div class="page" id="page-intimacoes">
+    <div class="ph">
+      <div><h1>Intimações</h1><p>Busca por nome do advogado ou OAB nos diários de justiça</p></div>
+      <div class="ph-acts">
+        <button class="btn btn-outline btn-sm" onclick="nav('prazos')">📋 Ver prazos</button>
+        <button class="btn btn-gold btn-sm" onclick="buscarIntimacoesAuto()">🔍 Buscar</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 270px;gap:14px;flex:1;min-height:0;overflow:hidden;">
+      <div style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+        <div style="background:rgba(255,248,246,0.92);border:1px solid var(--border);border-radius:var(--r2);padding:13px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 75px;gap:9px;align-items:end;">
+            <div class="fg" style="margin-bottom:0;"><label class="fl">Nome do advogado</label><input class="fi" id="intim-nome" placeholder="Tatiani Fabi"/></div>
+            <div class="fg" style="margin-bottom:0;"><label class="fl">OAB</label><input class="fi" id="intim-oab" placeholder="PR 12345"/></div>
+            <div class="fg" style="margin-bottom:0;"><label class="fl">Data</label><input class="fi" type="date" id="intim-data"/></div>
+            <div class="fg" style="margin-bottom:0;"><label class="fl">Dias úteis</label><input class="fi" type="number" id="intim-prazo" value="15" min="1" max="60"/></div>
+          </div>
+        </div>
+        <div class="alert alert-g" id="intim-status">Configure e clique em Buscar.</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <a href="https://comunica.pje.jus.br/" target="_blank" class="btn btn-xs btn-outline">🔗 PJe Comunicações</a>
+          <a href="https://portal.tjpr.jus.br/web/guest/consulta-de-publicacoes-do-dje" target="_blank" class="btn btn-xs btn-outline">🔗 DJe TJPR</a>
+          <a href="https://www.trf4.jus.br/trf4/processos/dje.php" target="_blank" class="btn btn-xs btn-outline">🔗 DJe TRF-4</a>
+          <a href="https://esaj.tjsp.jus.br/dje/index.do" target="_blank" class="btn btn-xs btn-outline">🔗 DJe TJSP</a>
+        </div>
+        <div id="intim-results"></div>
+        <div id="intim-import-area" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:10px;color:var(--text2);text-transform:uppercase;font-weight:700;">Importar como prazos</span>
+            <button class="btn btn-gold btn-sm" onclick="importarIntimacoesComoPrazos()">↓ Importar selecionadas</button>
+          </div>
+        </div>
+      </div>
+      <div style="background:rgba(255,248,246,0.92);border:1px solid var(--border);border-radius:var(--r2);padding:13px;overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+          <span style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;">Tribunais</span>
+          <div style="display:flex;gap:4px;"><button class="btn btn-xs btn-outline" onclick="selTribunais(true)">Todos</button><button class="btn btn-xs btn-outline" onclick="selTribunais(false)">Nenhum</button></div>
+        </div>
+        <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:4px;">Estaduais</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjpr" checked style="accent-color:#9a6060;"/> TJPR</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjsp" style="accent-color:#9a6060;"/> TJSP</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjrj" style="accent-color:#9a6060;"/> TJRJ</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjmg" style="accent-color:#9a6060;"/> TJMG</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjrs" style="accent-color:#9a6060;"/> TJRS</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjsc" style="accent-color:#9a6060;"/> TJSC</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjba" style="accent-color:#9a6060;"/> TJBA</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjgo" style="accent-color:#9a6060;"/> TJGO</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjpe" style="accent-color:#9a6060;"/> TJPE</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-tjdf" style="accent-color:#9a6060;"/> TJDFT</label>
+        <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin:7px 0 4px;">Superiores</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-stj" style="accent-color:#9a6060;"/> STJ</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-stf" style="accent-color:#9a6060;"/> STF</label>
+        <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin:7px 0 4px;">TRFs</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trf1" style="accent-color:#9a6060;"/> TRF-1ª</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trf2" style="accent-color:#9a6060;"/> TRF-2ª</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trf3" style="accent-color:#9a6060;"/> TRF-3ª</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trf4" checked style="accent-color:#9a6060;"/> TRF-4ª (PR)</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trf5" style="accent-color:#9a6060;"/> TRF-5ª</label>
+        <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase;margin:7px 0 4px;">TRTs</div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trt9" checked style="accent-color:#9a6060;"/> TRT-9ª (PR)</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trt2" style="accent-color:#9a6060;"/> TRT-2ª (SP)</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trt4" style="accent-color:#9a6060;"/> TRT-4ª (RS)</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-trt15" style="accent-color:#9a6060;"/> TRT-15ª</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-dje" style="accent-color:#9a6060;"/> DJe Federal</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-bottom:4px;"><input type="checkbox" id="t-pje" style="accent-color:#9a6060;"/> PJe</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- IMPORTAR -->
+  <div class="page" id="page-importar">
+    <div class="ph"><div class="ph-left"><h1>Importar Peças</h1><p>Arraste arquivos ou pastas completas — .docx · .txt · .pdf</p></div></div>
+    <div class="g2" style="margin-bottom:14px;">
+      <div class="fg"><label class="fl">Pasta de destino</label><select class="fi" id="imp-pasta"><option value="">— Raiz —</option></select></div>
+      <div class="fg"><label class="fl">Área padrão</label>
+        <select class="fi" id="imp-area"><option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option><option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option></select>
+      </div>
+    </div>
+    <div class="alert alert-g" style="margin-bottom:12px;">✦ Ao importar, a IA identifica automaticamente o tipo, área e assunto de cada peça e sugere a categorização.</div>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('fi-inp').click()" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)">
+      <input type="file" id="fi-inp" multiple accept=".docx,.doc,.txt,.pdf" webkitdirectory="" style="display:none;" onchange="onFSel(event)"/>
+      <div style="font-size:28px;opacity:.4;margin-bottom:7px;">📂</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:2px;">Clique ou arraste arquivos / pastas inteiras aqui</div>
+      <div style="font-size:11px;color:var(--text3);">Suporta .docx · .txt · .pdf — múltiplos arquivos de uma vez</div>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-outline btn-xs" onclick="document.getElementById('fi-inp-single').click()">Selecionar arquivos individuais</button>
+      <button class="btn btn-outline btn-xs" onclick="document.getElementById('fi-inp-folder').click()">Selecionar pasta inteira</button>
+      <input type="file" id="fi-inp-single" multiple accept=".docx,.doc,.txt,.pdf" style="display:none;" onchange="onFSel(event)"/>
+      <input type="file" id="fi-inp-folder" multiple webkitdirectory style="display:none;" onchange="onFSel(event)"/>
+    </div>
+    <div id="imp-list" style="margin-top:10px;"></div>
+    <div id="imp-prog-wrap" style="display:none;margin-top:8px;">
+      <div style="font-size:11.5px;color:var(--text2);margin-bottom:4px;" id="imp-lbl"></div>
+      <div class="pb"><div class="pf" id="imp-pf"></div></div>
+    </div>
+    <div style="display:flex;gap:7px;margin-top:10px;">
+      <button class="btn btn-gold btn-sm" id="btn-imp" onclick="doImport()" style="display:none;">↓ Importar e categorizar</button>
+      <button class="btn btn-outline btn-sm" onclick="clearImp()">Limpar</button>
+    </div>
+    <div id="imp-fb" style="font-size:12px;color:var(--gr2);margin-top:7px;display:none;"></div>
+  </div>
+
+  <!-- PESQUISA JURÍDICA -->
+  <div class="page" id="page-pesquisa">
+    <div class="ph"><div class="ph-left"><h1>Pesquisa Jurídica</h1><p>STJ · STF · TJs · Legislação — online e na biblioteca interna</p></div></div>
+    <div class="alert alert-b">✦ Online: busca com IA em tribunais e legislação. Offline: pesquisa somente na biblioteca interna.</div>
+    <div class="sr" style="margin-bottom:9px;">
+      <input class="si" style="flex:2;" id="pesq-q" placeholder="Ex: dano moral cobrança indevida CDC..." onkeydown="if(event.key==='Enter')pesquisar()"/>
+      <select class="si" id="pesq-tipo"><option value="">Jurisprudência + Lei</option><option value="j">Jurisprudência</option><option value="l">Legislação</option><option value="s">Súmulas</option></select>
+      <select class="si" id="pesq-trib"><option value="">Todos</option><option>STJ</option><option>STF</option><option>TJSP</option><option>TJPR</option><option>TJRJ</option><option>TJMG</option></select>
+      <button class="btn btn-gold btn-sm" onclick="pesquisar()">Pesquisar</button>
+    </div>
+    <div class="tag-cloud" style="margin-bottom:14px;">
+      <span class="tag" onclick="qs('dano moral CDC consumidor')">Dano moral CDC</span>
+      <span class="tag" onclick="qs('cobrança indevida banco repetição indébito')">Cobrança indevida banco</span>
+      <span class="tag" onclick="qs('inscrição indevida SPC Serasa')">SPC indevido</span>
+      <span class="tag" onclick="qs('prazo prescrição consumidor CDC')">Prescrição CDC</span>
+      <span class="tag" onclick="qs('inversão ônus prova CDC')">Inversão ônus</span>
+      <span class="tag" onclick="qs('alimentos divórcio guarda compartilhada')">Alimentos/guarda</span>
+      <span class="tag" onclick="qs('juros abusivos contrato bancário revisão')">Juros abusivos</span>
+      <span class="tag" onclick="qs('embargos de declaração omissão contradição')">Embargos declaração</span>
+      <span class="tag" onclick="qs('dano moral trabalhista assédio moral')">Assédio moral</span>
+    </div>
+    <div id="pesq-res"></div>
+  </div>
+
+  <!-- PRAZOS -->
+  <div class="page" id="page-prazos">
+    <div class="ph">
+      <div class="ph-left"><h1>Controle de Prazos</h1><p>Diário e semanal — marque como cumprido ao finalizar</p></div>
+      <div class="ph-acts">
+        <select class="si" id="prazos-filtro" onchange="renderPrazos()" style="min-width:120px;">
+          <option value="todos">Todos</option><option value="pendente">Pendentes</option><option value="urgente">Urgentes (7d)</option><option value="concluido">Concluídos</option>
+        </select>
+        <button class="btn btn-outline btn-sm" onclick="openModal('modal-dje')">🔍 Importar DJe</button>
+        <button class="btn btn-outline btn-sm" onclick="openModal('modal-cpj')">📊 Importar planilha / CPJ</button>
+        <button class="btn btn-outline btn-sm" onclick="populateSels();openModal('modal-lembrete-rec')" title="Criar prazo que se repete automaticamente">🔁 Recorrente</button>
+        <button class="btn btn-outline btn-sm" onclick="abrirDespachoModal()" title="Colar despacho/decisão e a IA identifica o prazo">📋 Ler Despacho</button>
+        <button class="btn btn-outline btn-sm" onclick="exportarPrazosICS()" title="Exportar para Google Calendar">📅 .ics</button>
+        <button class="btn btn-gold btn-sm" onclick="openModal('modal-prazo')">+ Novo prazo</button>
+      </div>
+    </div>
+    <div id="prazos-semana" style="margin-bottom:16px;"></div>
+    <div id="prazos-list"></div>
+  </div>
+
+  <!-- AGENDA -->
+  <div class="page" id="page-agenda">
+    <div class="ph">
+      <div class="ph-left"><h1>Agenda</h1><p>Audiências e compromissos</p></div>
+      <div class="ph-acts">
+        <div style="display:flex;gap:5px;align-items:center;">
+          <button class="btn btn-outline btn-sm" onclick="navAgendaMes(-1)">◀</button>
+          <span id="ag-mes-label" style="font-size:13px;font-weight:600;color:var(--text);padding:6px 12px;background:rgba(255,248,246,0.80);border-radius:var(--r);border:1px solid var(--border);min-width:140px;text-align:center;"></span>
+          <button class="btn btn-outline btn-sm" onclick="navAgendaMes(1)">▶</button>
+          <button class="btn btn-outline btn-sm" onclick="agMesAtual=new Date();renderAgenda()">Hoje</button>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="openModal('modal-cpj')">📊 Importar</button>
+        <button class="btn btn-outline btn-sm" onclick="exportarAgendaICS()" title="Exportar para Google/Apple Calendar">📅 Exportar .ics</button>
+        <button class="btn btn-gold btn-sm" onclick="openModal('modal-audiencia')">+ Nova audiência</button>
+      </div>
+    </div>
+    <!-- Day headers -->
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border-radius:var(--r) var(--r) 0 0;overflow:hidden;flex-shrink:0;margin-top:8px;">
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Dom</div>
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Seg</div>
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Ter</div>
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Qua</div>
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Qui</div>
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Sex</div>
+      <div style="background:rgba(154,96,96,0.10);padding:7px;text-align:center;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;">Sáb</div>
+    </div>
+    <div id="ag-cal-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border-radius:0 0 var(--r) var(--r);overflow:hidden;flex:1;min-height:0;overflow-y:auto;"></div>
+    <div style="margin-top:12px;flex-shrink:0;">
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.09em;margin-bottom:7px;">📋 Próximas audiências</div>
+      <div id="aud-list" style="max-height:180px;overflow-y:auto;"></div>
+    </div>
+  </div>
+
+
+  <!-- VISUAL LAW -->
+  <div class="page" id="page-timbrados">
+    <div class="ph">
+      <div class="ph-left"><h1>Visual Law</h1><p>Papéis timbrados — escritório, empresas e pessoal</p></div>
+      <div class="ph-acts"><button class="btn btn-gold btn-sm" onclick="openModal('modal-timbrado')">+ Novo timbrado</button></div>
+    </div>
+    <div class="grid" id="timbrados-grid"></div>
+  </div>
+
+  <!-- BIBLIOTECA DE TESES -->
+  <div class="page" id="page-teses">
+    <div class="ph">
+      <div class="ph-left"><h1>Biblioteca de Teses</h1><p>Blocos de fundamentação jurídica reutilizáveis com adaptação por IA</p></div>
+      <div class="ph-acts">
+        <button class="btn btn-outline btn-sm" onclick="aplicarTeseComIA()" title="IA identifica teses aplicáveis ao texto aberto no editor">✦ Sugerir teses</button>
+        <button class="btn btn-outline btn-sm" id="btn-auto-teses" onclick="toggleAutoTeses()" title="Auto-extrair teses ao salvar peças">🤖 Auto-extração: ativada</button>
+        <button class="btn btn-gold btn-sm" onclick="openModal('modal-nova-tese')">+ Nova tese</button>
+      </div>
+    </div>
+    <div id="teses-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;overflow-y:auto;flex:1;"></div>
+  </div>
+
+  <!-- TRIAGEM RÁPIDA -->
+  <div class="page" id="page-triagem">
+    <div class="ph">
+      <div class="ph-left"><h1>Triagem Rápida</h1><p>IA processa relatos, documentos e imagens para extrair dados e gerar peças</p></div>
+      <div class="ph-acts">
+        <select class="si" id="triagem-tipo-peca" onchange="atualizarTipoTriagem()" style="min-width:180px;">
+          <option value="triagem">⚡ Triagem — extrair dados do caso</option>
+          <option value="peticao">📋 Gerar petição inicial</option>
+          <option value="parecer">⚖ Redigir parecer jurídico</option>
+          <option value="contrato">📝 Redigir contrato</option>
+          <option value="outro">🔧 Outro / livre</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1;min-height:0;overflow:hidden;">
+      <div style="display:flex;flex-direction:column;gap:10px;overflow-y:auto;">
+        <div class="card" style="padding:16px;border-radius:var(--r2);flex:1;display:flex;flex-direction:column;">
+          <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:8px;">Entrada</div>
+          <textarea id="triagem-texto" class="fi" style="min-height:220px;resize:vertical;font-size:12.5px;line-height:1.7;flex:1;" placeholder="Cole o relato bruto do cliente (WhatsApp, e-mail, transcrição de conversa)..."></textarea>
+          <!-- File upload -->
+          <div style="margin-top:8px;">
+            <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:5px;">Documentos e imagens (opcional)</div>
+            <div id="triagem-files-list"></div>
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('triagem-file-inp').click()" style="margin-top:4px;">📎 Anexar arquivo ou imagem</button>
+            <input type="file" id="triagem-file-inp" multiple accept="image/*,application/pdf,.txt,.docx" style="display:none;" onchange="onTriagemFileAdd(event)"/>
+            <div style="font-size:10px;color:var(--text3);margin-top:4px;">A IA vai ler imagens, PDFs e textos anexados</div>
+          </div>
+          <button id="triagem-btn" class="btn btn-gold" style="width:100%;margin-top:10px;font-size:13px;padding:10px;" onclick="processarTriagem()">⚡ Extrair dados do caso</button>
+          <div id="triagem-loading" style="display:none;text-align:center;padding:10px;color:var(--text3);font-size:12px;">⏳ Processando com IA...</div>
+        </div>
+      </div>
+      <div style="overflow-y:auto;">
+        <div class="card" style="padding:16px;border-radius:var(--r2);">
+          <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:10px;">Resultado</div>
+          <div id="triagem-resultado" style="color:var(--text3);font-size:12px;font-style:italic;">Aguardando processamento...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- LOGS -->
+  <div class="page" id="page-logs">
+    <div class="ph">
+      <div class="ph-left"><h1>Log de Alterações</h1><p>Histórico de ações realizadas no sistema</p></div>
+      <div class="ph-acts">
+        <button class="btn btn-outline btn-sm" onclick="confirmar('Limpar todo o histórico de logs?',function(){sv('logs',[]);renderLogs();showToast('✓ Log limpo.');},'🗂','Limpar','rgba(204,68,68,0.85)')">🗑 Limpar log</button>
+      </div>
+    </div>
+    <div style="overflow-y:auto;flex:1;">
+      <div id="logs-list" style="padding:0 4px;"></div>
+    </div>
+  </div>
+
+  <!-- FINANCEIRO -->
+  <div class="page" id="page-financeiro">
+    <div class="ph">
+      <div class="ph-left"><h1>Financeiro</h1><p>Honorários e controle de recebimentos</p></div>
+      <div class="ph-acts">
+        <button class="btn btn-outline btn-sm" onclick="exportarFinanceiro()">↓ Exportar</button>
+        <button class="btn btn-gold btn-sm" onclick="openModal('modal-honorario')">+ Novo honorário</button>
+      </div>
+    </div>
+    <!-- Cards resumo -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;flex-shrink:0;">
+      <div class="card" style="padding:14px 16px;border-radius:var(--r2);">
+        <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:5px;">Total previsto</div>
+        <div id="fin-total" style="font-size:20px;font-weight:800;color:var(--text);">R$ 0</div>
+      </div>
+      <div class="card" style="padding:14px 16px;border-radius:var(--r2);">
+        <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:5px;">Recebido</div>
+        <div id="fin-recebido" style="font-size:20px;font-weight:800;color:#4a7a58;">R$ 0</div>
+      </div>
+      <div class="card" style="padding:14px 16px;border-radius:var(--r2);">
+        <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:5px;">Pendente</div>
+        <div id="fin-pendente" style="font-size:20px;font-weight:800;color:#e0aa44;">R$ 0</div>
+      </div>
+      <div class="card" style="padding:14px 16px;border-radius:var(--r2);">
+        <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:5px;">Em atraso</div>
+        <div id="fin-atraso" style="font-size:20px;font-weight:800;color:#cc4444;">R$ 0</div>
+      </div>
+    </div>
+    <!-- Gráfico + Lista -->
+    <div style="display:grid;grid-template-columns:260px 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
+      <!-- Estatísticas -->
+      <div style="overflow-y:auto;display:flex;flex-direction:column;gap:12px;">
+        <div class="card" style="padding:14px;border-radius:var(--r2);">
+          <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);margin-bottom:10px;">📊 Taxa de êxito</div>
+          <div id="fin-stats-exito" style="font-size:13px;color:var(--text2);line-height:1.8;"></div>
+        </div>
+        <div class="card" style="padding:14px;border-radius:var(--r2);">
+          <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);margin-bottom:10px;">📈 Casos por mês</div>
+          <div id="fin-stats-meses" style="font-size:11px;color:var(--text2);"></div>
+        </div>
+        <div class="card" style="padding:14px;border-radius:var(--r2);">
+          <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);margin-bottom:10px;">💰 Valor recuperado</div>
+          <div id="fin-stats-valor" style="font-size:15px;font-weight:700;color:#4a7a58;"></div>
+        </div>
+      </div>
+      <!-- Lista de honorários -->
+      <div style="overflow-y:auto;">
+        <div id="fin-lista" style="display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="page" id="page-admin">
+    <div class="ph"><div class="ph-left"><h1>Administração</h1><p>Usuários e acessos — somente administrador</p></div></div>
+    <div style="max-width:560px;">
+      <div class="alert alert-g" style="margin-bottom:14px;">Administradora geral: tatiani.fabi@live.com · tatianifabi@gmail.com</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;font-weight:500;">Usuários cadastrados</div>
+        <button class="btn btn-gold btn-sm" onclick="openModal('modal-novo-user')">+ Novo usuário</button>
+      </div>
+      <div id="users-list"></div>
+    </div>
+  </div>
+
+  </main>
+</div>
+
+<!-- ════════════════════════════════════════════
+     MODALS
+════════════════════════════════════════════ -->
+
+<!-- MODAL NOVA PEÇA (direto para editor) -->
+<div class="ov" id="modal-peca-quick">
+<div class="modal" style="max-width:540px;">
+  <div class="mh"><div class="mt">Adicionar à Biblioteca</div><button class="mc" onclick="closeModal('modal-peca-quick')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg full"><label class="fl">Título</label><input class="fi" id="pq-titulo" placeholder="Ex: Contestação — cobrança indevida"/></div>
+      <div class="fg"><label class="fl">Tipo</label>
+        <select class="fi" id="pq-tipo">
+          <option>Contestação</option><option>Petição Inicial</option><option>Recurso de Apelação</option>
+          <option>Agravo de Instrumento</option><option>Agravo Interno</option><option>Embargos de Declaração</option>
+          <option>Impugnação</option><option>Contrarrazões</option><option>Manifestação</option>
+          <option>Petições Diversas</option><option>Contrato</option><option>Distrato</option><option>Parecer</option><option>Outros</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Área</label>
+        <select class="fi" id="pq-area"><option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option><option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option></select>
+      </div>
+      <div class="fg"><label class="fl">Pasta</label><select class="fi" id="pq-pasta"><option value="">— Raiz —</option></select></div>
+      <div class="fg"><label class="fl">Timbrado</label><select class="fi" id="pq-timbrado"><option value="">— Nenhum —</option></select></div>
+      <div class="fg"><label class="fl">Caso</label><select class="fi" id="pq-caso"><option value="">— Nenhum —</option></select></div>
+      <div class="fg"><label class="fl">Resultado</label><select class="fi" id="pq-res"><option>Pendente</option><option>Ganho</option><option>Perda</option></select></div>
+      <div class="fg full"><label class="fl">Tese jurídica</label><input class="fi" id="pq-tese" placeholder="Argumento central"/></div>
+      <div class="fg full"><label class="fl">Texto (cole ou escreva)</label><textarea class="fi" id="pq-texto" style="min-height:160px;"></textarea></div>
+      <div class="fg full"><label class="fl">Observações</label><textarea class="fi" id="pq-obs" style="min-height:60px;" placeholder="Contexto, cliente, tribunal, lições..."></textarea></div>
+      <div class="fg"><label class="fl">Data</label><input class="fi" type="date" id="pq-data"/></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-peca-quick')">Cancelar</button><button class="btn btn-gold" onclick="savePecaQuick()">Salvar</button></div>
+</div>
+</div>
+
+<!-- MODAL VER PEÇA -->
+<div class="ov" id="modal-ver-peca">
+<div class="modal" style="max-width:860px;">
+  <div class="mh"><div class="mt" id="vp-titulo">—</div><button class="mc" onclick="closeModal('modal-ver-peca')">✕</button></div>
+  <div class="mb">
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px;align-items:center;">
+      <span class="tt" id="vp-tipo-badge">—</span>
+      <span style="font-size:10px;color:var(--text2);padding:2px 8px;background:var(--bg3);border-radius:20px;" id="vp-area-badge"></span>
+      <span style="font-size:10px;color:var(--text3);padding:2px 8px;background:var(--bg3);border-radius:20px;" id="vp-pasta-badge"></span>
+      <span style="font-size:10px;color:var(--text3);padding:2px 8px;background:var(--bg3);border-radius:20px;" id="vp-caso-badge"></span>
+      <span style="font-size:10.5px;font-weight:500;" id="vp-res-badge"></span>
+      <span style="margin-left:auto;font-size:10.5px;color:var(--text3);" id="vp-data-badge"></span>
+    </div>
+    <div style="font-size:12px;color:var(--text2);font-style:italic;margin-bottom:7px;" id="vp-tese"></div>
+    <div id="vp-obs-box" style="display:none;background:var(--gglow);border:1px solid rgba(200,168,75,.16);border-radius:var(--r);padding:8px 11px;font-size:11px;color:var(--gold2);margin-bottom:11px;"></div>
+    <div class="dv"></div>
+    <div style="font-size:12px;line-height:1.85;white-space:pre-wrap;color:var(--text);font-family:'DM Mono',monospace;background:var(--bg);padding:13px;border-radius:var(--r);border:1px solid var(--border);max-height:380px;overflow-y:auto;" id="vp-texto">—</div>
+  </div>
+  <div class="mf" style="gap:6px;">
+    <button class="btn btn-danger btn-xs" onclick="delVerPeca()">Excluir</button>
+    <button class="btn btn-outline btn-sm" onclick="closeModal('modal-ver-peca')">Fechar</button>
+    <button class="btn btn-outline btn-sm" onclick="copyVerTxt()">Copiar</button>
+    <button class="btn btn-outline btn-sm" onclick="printVerPeca()">🖨 Imprimir</button>
+    <button class="btn btn-outline btn-sm" onclick="exportVerDocx()">↓ .docx</button>
+    <button class="btn btn-gold btn-sm" onclick="useAsBase()">Editar no editor ↗</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL CASO -->
+<div class="ov" id="modal-caso">
+<div class="modal" style="max-width:640px;">
+  <div class="mh"><div class="mt" id="caso-modal-title">Novo Cliente</div><button class="mc" onclick="closeModal('modal-caso')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;">✦ Cada cliente pode ter várias ações (subpastas) com peças e documentos separados.</div>
+    <div class="g2">
+      <div class="fg full"><label class="fl">Nome do cliente</label><input class="fi" id="c-nome" placeholder="Ex: Tatiani Fabi · João da Silva · Empresa ABC"/></div>
+      <div class="fg"><label class="fl">CPF / CNPJ</label><input class="fi" id="c-cpf" placeholder="000.000.000-00"/></div>
+      <div class="fg"><label class="fl">Telefone</label><input class="fi" id="c-tel" placeholder="(41) 9 9999-9999"/></div>
+      <div class="fg full"><label class="fl">Email</label><input class="fi" id="c-email" placeholder="cliente@email.com"/></div>
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fi" id="c-status"><option value="ativo">Ativo</option><option value="encerrado">Encerrado</option></select>
+      </div>
+      <div class="fg"><label class="fl">Área principal</label>
+        <select class="fi" id="c-area"><option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option><option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option></select>
+      </div>
+      <div class="fg full"><label class="fl">Observações / Dados adicionais</label>
+        <textarea class="fi" id="c-obs" style="min-height:65px;" placeholder="Endereço, dados relevantes, contexto..."></textarea>
+      </div>
+    </div>
+    <div class="dv"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;">Ações / Processos</div>
+      <button class="btn btn-outline btn-xs" onclick="addAcaoRow()">+ Adicionar ação</button>
+    </div>
+    <div id="acoes-rows">
+      <div class="acao-row" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:7px;align-items:end;">
+        <div class="fg" style="margin-bottom:0;"><label class="fl">Nome da ação</label><input class="fi acao-nome" placeholder="Ex: Ação SHEIN · Ação COPEL"/></div>
+        <div class="fg" style="margin-bottom:0;"><label class="fl">Nº do processo</label><input class="fi acao-num" placeholder="0001234-56.2024.8.16.0001"/></div>
+        <button class="btn btn-outline btn-xs" onclick="this.closest('.acao-row').remove()" style="margin-bottom:0;align-self:end;">✕</button>
+      </div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-caso')">Cancelar</button><button class="btn btn-gold" onclick="saveCaso()">Salvar cliente</button></div>
+</div>
+</div>
+
+<!-- MODAL VER CASO -->
+<div class="ov" id="modal-ver-caso">
+<div class="modal" style="max-width:860px;max-height:92vh;">
+  <div class="mh" style="padding:14px 20px;">
+    <div>
+      <div class="mt" id="ver-caso-nome" style="font-size:18px;">📁 Cliente</div>
+      <div style="font-size:11.5px;color:var(--text3);margin-top:2px;" id="ver-caso-info"></div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="btn btn-outline btn-xs" onclick="editarCaso(currentCasoId)">✎ Editar</button>
+      <button onclick="gerarRelatorioCliente()" style="background:rgba(88,104,170,0.10);border:1px solid rgba(88,104,170,0.25);color:#5868aa;border-radius:var(--r);padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;">📄 Relatório</button>
+      <button onclick="excluirCaso(currentCasoId)" style="background:rgba(204,68,68,0.10);border:1px solid rgba(204,68,68,0.25);color:#aa2222;border-radius:var(--r);padding:4px 10px;cursor:pointer;font-size:11px;font-weight:600;">🗑</button>
+      <button onclick="gerarProcuracao(currentCasoId,'procuracao')" class="btn btn-xs btn-outline" title="Gerar procuração com IA">📝 Procuração</button>
+      <button onclick="gerarProcuracao(currentCasoId,'substabelecimento')" class="btn btn-xs btn-outline" title="Gerar substabelecimento com IA">📝 Substab.</button>
+      <button class="mc" onclick="closeModal('modal-ver-caso')">✕</button>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:250px 1fr;height:calc(92vh - 78px);overflow:hidden;">
+    <!-- SIDEBAR -->
+    <div style="border-right:1px solid var(--border);overflow-y:auto;background:rgba(255,248,246,0.50);padding:14px;display:flex;flex-direction:column;gap:4px;">
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.09em;margin-bottom:5px;">📋 Ações do processo</div>
+      <div id="ver-caso-acoes-list"></div>
+      <button class="btn btn-outline btn-xs" style="width:100%;margin-top:6px;" onclick="addAcaoAoCaso()">+ Nova ação</button>
+      <div style="height:1px;background:var(--border);margin:10px 0 8px;"></div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;font-weight:700;letter-spacing:.09em;margin-bottom:3px;">📁 Documentos pessoais</div>
+      <div style="font-size:10.5px;color:var(--text3);margin-bottom:6px;line-height:1.4;">RG, CPF, comprovantes — só desta pasta</div>
+      <div id="ver-caso-docs-list"></div>
+      <button class="btn btn-outline btn-xs" style="width:100%;margin-top:6px;" onclick="document.getElementById('doc-upload-inp').click()">↑ Adicionar documento</button>
+      <input type="file" id="doc-upload-inp" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt" style="display:none;" onchange="uploadDocCliente(event)"/>
+    </div>
+    <!-- CONTEÚDO DA AÇÃO -->
+    <div id="ver-caso-acao-content" style="padding:18px;overflow-y:auto;">
+      <div style="color:var(--text3);font-size:13px;text-align:center;padding:50px 20px;">
+        <div style="font-size:36px;margin-bottom:12px;">📋</div>
+        Selecione uma ação ao lado para ver detalhes, peças e documentos
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MODAL ANDAMENTO -->
+<div class="ov" id="modal-andamento">
+<div class="modal" style="max-width:420px;">
+  <div class="mh"><div class="mt">Novo Andamento</div><button class="mc" onclick="closeModal('modal-andamento')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">Data</label><input class="fi" type="date" id="and-data"/></div>
+    <div class="fg"><label class="fl">Descrição</label><textarea class="fi" id="and-texto" style="min-height:90px;" placeholder="Ex: Contestação protocolada. Aguardando citação..."></textarea></div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-andamento')">Cancelar</button><button class="btn btn-gold" onclick="saveAndamento()">Salvar</button></div>
+</div>
+</div>
+
+<!-- MODAL PRAZO -->
+<div class="ov" id="modal-prazo">
+<div class="modal" style="max-width:620px;">
+  <div class="mh"><div class="mt" id="prazo-mt">Novo Prazo</div><button class="mc" onclick="closeModal('modal-prazo')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg full"><label class="fl">Descrição *</label><input class="fi" id="pr-desc" placeholder="Ex: Contestação — Ação SHEIN"/></div>
+      <div class="fg"><label class="fl">Tipo</label>
+        <select class="fi" id="pr-tipo" onchange="calcFatalAuto()">
+          <option>Contestação</option><option>Recurso de Apelação</option><option>Agravo de Instrumento</option>
+          <option>Agravo Interno</option><option>Embargos de Declaração</option><option>Contrarrazões</option>
+          <option>Manifestação</option><option>Impugnação</option><option>Alegações Finais</option>
+          <option>Recurso Inominado</option><option>Recurso Especial (RESP)</option>
+          <option>Petições Diversas</option><option>Habilitação</option><option>Outros</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Caso vinculado</label><select class="fi" id="pr-caso"><option value="">— Nenhum —</option></select></div>
+      <div class="fg"><label class="fl">Nº do processo</label><input class="fi" id="pr-num" placeholder="0001234-56.2024.8.16.0001"/></div>
+      <div class="fg"><label class="fl">Parte autora</label><input class="fi" id="pr-autor" placeholder="Nome do autor"/></div>
+      <div class="fg"><label class="fl">Parte ré</label><input class="fi" id="pr-reu" placeholder="Nome do réu"/></div>
+      <div style="height:1px;background:var(--border);margin:4px 0;grid-column:1/-1;"></div>
+      <div class="fg"><label class="fl">Data de chegada / publicação</label>
+        <input class="fi" type="date" id="pr-chegou" onchange="calcFatalAuto()"/>
+      </div>
+      <div class="fg"><label class="fl">Prazo (dias úteis)</label>
+        <select class="fi" id="pr-dias-uteis" onchange="calcFatalAuto()">
+          <option value="5">5 dias úteis</option><option value="10">10 dias úteis</option>
+          <option value="15" selected>15 dias úteis</option><option value="30">30 dias úteis</option>
+          <option value="60">60 dias úteis</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Data fatal (calculada)</label>
+        <input class="fi" type="date" id="pr-fatal" onchange="atualizarFatalBadge(this.value)" style="font-weight:600;"/>
+        <div id="pr-fatal-disp" style="margin-top:4px;"></div>
+      </div>
+      <div class="fg"><label class="fl">Data protocolo (manual)</label>
+        <input class="fi" type="date" id="pr-data"/>
+      </div>
+      <!-- RECORRENTE -->
+      <div style="grid-column:1/-1;background:rgba(255,248,246,0.80);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:0;">
+          <input type="checkbox" id="pr-recorrente" style="accent-color:#9a6060;width:15px;height:15px;" onchange="onPrazoRecorrenteChange()"/>
+          <label for="pr-recorrente" style="font-size:12px;font-weight:600;color:var(--text);cursor:pointer;">🔁 Prazo recorrente (se repete automaticamente)</label>
+        </div>
+        <div id="pr-rec-opts" style="display:none;margin-top:8px;display:none;">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div class="fg" style="margin-bottom:0;"><label class="fl">Frequência</label>
+              <select class="fi" id="pr-rec-freq">
+                <option value="semanal">Semanal</option><option value="quinzenal">Quinzenal</option>
+                <option value="mensal" selected>Mensal</option><option value="bimestral">Bimestral</option>
+              </select>
+            </div>
+            <div class="fg" style="margin-bottom:0;"><label class="fl">Dia do mês</label>
+              <input class="fi" id="pr-rec-dia" type="number" min="1" max="28" placeholder="10"/>
+            </div>
+            <div class="fg" style="margin-bottom:0;"><label class="fl">Gerar próximos</label>
+              <select class="fi" id="pr-rec-count">
+                <option value="3">3 prazos</option><option value="6">6 prazos</option><option value="12">12 prazos</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fg full"><label class="fl">Observações</label>
+        <textarea class="fi" id="pr-obs" style="min-height:55px;" placeholder="Notas, links, documentos..."></textarea>
+      </div>
+      <!-- DOCUMENTOS DO PRAZO -->
+      <div style="grid-column:1/-1;">
+        <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:6px;">Documentos anexos</div>
+        <div id="pr-docs-list" style="margin-bottom:6px;"></div>
+        <button class="btn btn-outline btn-xs" onclick="document.getElementById('pr-file-inp').click()">↑ Anexar documento</button>
+        <input type="file" id="pr-file-inp" multiple style="display:none;" onchange="uploadDocPrazo(event)"/>
+      </div>
+    </div>
+  </div>
+  <div class="mf" style="justify-content:space-between;">
+    <button class="btn btn-outline btn-xs" onclick="closeModal('modal-prazo');nav('editor');setTimeout(function(){gerarContrarrazaoFromPrazoAtual();},200)">✦ Redigir peça</button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="closeModal('modal-prazo')">Cancelar</button>
+      <button class="btn btn-gold" onclick="savePrazo()">Salvar prazo</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MODAL AUDIÊNCIA -->
+<div class="ov" id="modal-audiencia">
+<div class="modal" style="max-width:620px;">
+  <div class="mh"><div class="mt">Nova Audiência</div><button class="mc" onclick="closeModal('modal-audiencia')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg full"><label class="fl">Descrição</label><input class="fi" id="au-desc" placeholder="Ex: Audiência de conciliação — João vs Banco X"/></div>
+      <div class="fg"><label class="fl">Tipo de audiência</label>
+        <select class="fi" id="au-tipo" onchange="onAuTipoChange()">
+          <option value="conciliacao">Conciliação / Mediação</option>
+          <option value="instrucao">Instrução e Julgamento</option>
+          <option value="una">Una (Instrução Única)</option>
+          <option value="administrativa">Administrativa</option>
+          <option value="outra">Outra</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Modalidade</label>
+        <select class="fi" id="au-modal">
+          <option value="presencial">🏛 Presencial</option>
+          <option value="online">💻 Online / Videoconferência</option>
+          <option value="hibrida">🔀 Híbrida</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Data</label><input class="fi" type="date" id="au-data"/></div>
+      <div class="fg"><label class="fl">Hora</label><input class="fi" type="time" id="au-hora"/></div>
+      <div class="fg"><label class="fl">Local / Vara</label><input class="fi" id="au-local" placeholder="Ex: 3ª Vara Cível — Sala 204"/></div>
+      <div class="fg"><label class="fl">Link (se online)</label><input class="fi" id="au-link" placeholder="https://meet.google.com/..."/></div>
+      <div class="fg full"><label class="fl">Número do processo</label><input class="fi" id="au-num" placeholder="0001234-56.2024.8.16.0001"/></div>
+      <div class="fg"><label class="fl">Caso vinculado</label><select class="fi" id="au-caso"><option value="">— Nenhum —</option></select></div>
+      <div class="fg"><label class="fl">Parte autora</label><input class="fi" id="au-autor" placeholder="Nome do autor"/></div>
+      <div class="fg"><label class="fl">Parte ré</label><input class="fi" id="au-reu" placeholder="Nome do réu"/></div>
+    </div>
+    <!-- NOTA CONCILIAÇÃO -->
+    <div id="au-nota-concil" style="display:none;margin-top:4px;">
+      <div class="alert alert-g">📌 <strong>Conciliação</strong> — Prepare proposta de acordo antes da audiência. Verifique os limites autorizados pelo cliente e os valores em debate.</div>
+      <div class="fg"><label class="fl">Proposta de acordo / Observações</label>
+        <textarea class="fi" id="au-obs-concil" style="min-height:65px;" placeholder="Valor proposto, limites do cliente, estratégia de conciliação..."></textarea>
+      </div>
+    </div>
+    <!-- OBSERVAÇÕES GERAIS -->
+    <div id="au-obs-wrap" style="margin-top:4px;">
+      <div class="fg"><label class="fl">Observações</label>
+        <textarea class="fi" id="au-obs" style="min-height:65px;" placeholder="Documentos necessários, estratégia..."></textarea>
+      </div>
+    </div>
+    <!-- PREP IA para instrução/una -->
+    <div id="au-prep-area" style="display:none;margin-top:8px;">
+      <div class="dv"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;font-weight:700;">Preparação IA para audiência de instrução</span>
+        <button class="btn btn-gold btn-xs" onclick="prepararAudienciaIA()">✦ Preparar com IA</button>
+      </div>
+      <div style="background:rgba(255,248,246,0.92);border:1px solid var(--border);border-radius:var(--r);padding:11px;font-size:11px;color:var(--text2);min-height:80px;white-space:pre-wrap;overflow-y:auto;max-height:240px;font-style:italic;" id="au-prep-out">A IA irá pesquisar o processo no banco interno e preparar perguntas estratégicas para a audiência...</div>
+    </div>
+  </div>
+  <!-- LEMBRETE CONFIGURÁVEL -->
+  <div style="padding:10px 20px 0;border-top:1px solid var(--border);">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;color:var(--text2);">🔔 Lembrete:</span>
+      <select class="fi" id="au-lembrete" style="max-width:180px;font-size:12px;">
+        <option value="0">Sem lembrete</option>
+        <option value="10">10 minutos antes</option>
+        <option value="15">15 minutos antes</option>
+        <option value="30">30 minutos antes</option>
+        <option value="60" selected>1 hora antes</option>
+        <option value="120">2 horas antes</option>
+        <option value="1440">1 dia antes</option>
+      </select>
+      <span style="font-size:10.5px;color:var(--text3);">O sistema vai notificar você no horário configurado.</span>
+    </div>
+  </div>
+  <div class="mf" style="justify-content:space-between;">
+    <div>
+      <button id="au-excluir-btn" onclick="delAudienciaFromModal()" style="display:none;background:rgba(204,68,68,0.10);border:1px solid rgba(204,68,68,0.25);color:#aa2222;border-radius:var(--r);padding:7px 14px;cursor:pointer;font-size:12px;font-weight:600;">🗑 Excluir audiência</button>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-outline" onclick="descartarAudiencia()">Descartar</button>
+      <button class="btn btn-gold" onclick="saveAudiencia()">Salvar</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- MODAL PASTA -->
+<div class="ov" id="modal-pasta">
+<div class="modal" style="max-width:480px;">
+  <div class="mh"><div class="mt" id="pasta-mt">Nova Pasta</div><button class="mc" onclick="closeModal('modal-pasta')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">Nome da pasta *</label><input class="fi" id="p-nome" placeholder="Ex: Contestações bancárias 2024"/></div>
+    <div class="g2" style="margin-top:8px;">
+      <div class="fg" style="margin-bottom:0;"><label class="fl">Emoji</label><input class="fi" id="p-emoji" placeholder="📁" maxlength="2"/></div>
+      <div class="fg" style="margin-bottom:0;"><label class="fl">Vincular à matéria</label>
+        <select class="fi" id="p-area">
+          <option value="">— Pasta geral (sem matéria) —</option>
+          <option value="Direito do Consumidor">⚖ Direito do Consumidor</option>
+          <option value="Direito Bancário">🏦 Direito Bancário</option>
+          <option value="Direito Civil">📋 Direito Civil</option>
+          <option value="Direito de Família">👨‍👩‍👧 Direito de Família</option>
+          <option value="Direito Trabalhista">💼 Direito Trabalhista</option>
+          <option value="Direito Penal">⚔ Direito Penal</option>
+          <option value="Juizado Especial Civil">🏅 Juizado Especial Civil</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" style="margin-top:8px;"><label class="fl">Descrição (opcional)</label><input class="fi" id="p-desc" placeholder="Descreva o conteúdo desta pasta..."/></div>
+    <div class="alert alert-g" style="margin-top:10px;font-size:11.5px;">
+      💡 Se vincular a uma matéria, a pasta aparece dentro dela na sidebar.<br/>
+      Se deixar sem matéria, aparece em "Pastas personalizadas".
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-pasta')">Cancelar</button><button class="btn btn-gold" onclick="savePasta()">Salvar pasta</button></div>
+</div>
+</div>
+
+<!-- MODAL TIMBRADO -->
+<div class="ov" id="modal-timbrado">
+<div class="modal" style="max-width:720px;">
+  <div class="mh"><div class="mt" id="tb-mt">Novo Timbrado Visual Law</div><button class="mc" onclick="closeModal('modal-timbrado')">✕</button></div>
+  <div class="mb">
+    <!-- ABAS -->
+    <div style="display:flex;gap:2px;margin-bottom:16px;border-bottom:1px solid var(--border);">
+      <button class="tb-btn active" id="tb-tab-config-btn" onclick="switchTbTab('config')" style="padding:6px 14px;font-size:12px;">⚙ Configurar</button>
+      <button class="tb-btn" id="tb-tab-modelo-btn" onclick="switchTbTab('modelo')" style="padding:6px 14px;font-size:12px;">📝 Modelo de Petição</button>
+      <button class="tb-btn" id="tb-tab-preview-btn" onclick="switchTbTab('preview')" style="padding:6px 14px;font-size:12px;">👁 Pré-visualização</button>
+    </div>
+
+    <!-- ABA CONFIG -->
+    <div id="tb-tab-config">
+      <div class="g2">
+        <div class="fg full"><label class="fl">Nome do timbrado</label><input class="fi" id="tb-nome" placeholder="Ex: Escritório Próprio · Empresa X · Pessoal"/></div>
+        <div class="fg full">
+          <label class="fl">Logo (upload de imagem)</label>
+          <div style="display:flex;gap:7px;align-items:center;">
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('tb-logo-file').click()">↑ Upload logo</button>
+            <button class="btn btn-outline btn-xs" onclick="clearTbLogo()">✕ Remover</button>
+            <span style="font-size:11px;color:var(--text3);" id="tb-logo-status">nenhuma imagem</span>
+          </div>
+          <input type="file" id="tb-logo-file" accept="image/*" style="display:none;" onchange="onLogoUpload(event)"/>
+          <div id="tb-logo-prev" style="display:none;margin-top:6px;"><img id="tb-logo-img" style="max-height:50px;border-radius:4px;"/></div>
+        </div>
+        <div class="fg full">
+          <label class="fl">Timbrado pronto (imagem ou PDF)</label>
+          <div class="alert alert-g" style="font-size:11px;margin-bottom:7px;">Envie uma imagem ou PDF do timbrado já pronto para usar como fundo ao exportar.</div>
+          <div style="display:flex;gap:6px;align-items:center;">
+            <button class="btn btn-outline btn-xs" onclick="document.getElementById('tb-ready-file').click()">↑ Upload</button>
+            <button class="btn btn-outline btn-xs" onclick="clearTbReady()">✕ Remover</button>
+            <span style="font-size:11px;color:var(--text3);" id="tb-ready-status">nenhum arquivo</span>
+          </div>
+          <input type="file" id="tb-ready-file" accept="image/*,application/pdf" style="display:none;" onchange="onTimbradoReadyUpload(event)"/>
+          <div id="tb-ready-prev" style="display:none;margin-top:8px;">
+            <img id="tb-ready-img" style="max-width:100%;border-radius:var(--r);border:1px solid var(--border);max-height:110px;object-fit:contain;display:none;"/>
+            <div id="tb-ready-pdf-info" style="display:none;font-size:11.5px;color:var(--text2);padding:8px;background:rgba(255,248,246,0.80);border-radius:var(--r);">📄 PDF carregado</div>
+          </div>
+        </div
+        </div>
+        <div class="fg full"><label class="fl">Linha 1 — nome do escritório / empresa</label><input class="fi" id="tb-l1" placeholder="Silva & Associados Advogados" oninput="updateTbPrev()"/></div>
+        <div class="fg full"><label class="fl">Linha 2</label><input class="fi" id="tb-l2" placeholder="OAB/PR 00.000 · contato@escritorio.com.br" oninput="updateTbPrev()"/></div>
+        <div class="fg full"><label class="fl">Linha 3 (opcional)</label><input class="fi" id="tb-l3" placeholder="Rua das Flores, 123 — Curitiba/PR · (41) 9 9999-9999" oninput="updateTbPrev()"/></div>
+        <div class="fg"><label class="fl">Cor principal</label><input type="color" class="fi" id="tb-cor" value="#8a5070" style="height:36px;cursor:pointer;padding:3px;" oninput="updateTbPrev()"/></div>
+        <div class="fg"><label class="fl">Alinhamento</label><select class="fi" id="tb-align" onchange="updateTbPrev()"><option value="center">Centralizado</option><option value="left">Esquerda</option><option value="right">Direita</option></select></div>
+        <div class="fg"><label class="fl">Fonte da petição</label><select class="fi" id="tb-fonte" onchange="updateTbPrev()"><option value="Times New Roman">Times New Roman</option><option value="Arial">Arial</option><option value="Garamond">Garamond</option><option value="Calibri">Calibri</option></select></div>
+        <div class="fg"><label class="fl">Tamanho da fonte</label><select class="fi" id="tb-fontsize" onchange="updateTbPrev()"><option value="12pt">12pt (padrão)</option><option value="11pt">11pt</option><option value="13pt">13pt</option></select></div>
+        <div class="fg full"><label class="fl">Rodapé (opcional)</label><input class="fi" id="tb-rodape" placeholder="OAB/PR 00.000 — Página {num}" oninput="updateTbPrev()"/></div>
+        <div class="fg full"><label class="fl">Endereçamento padrão (início da petição)</label><textarea class="fi" id="tb-enderecamento" style="min-height:60px;" placeholder="EXCELENTÍSSIMO(A) SENHOR(A) DOUTOR(A) JUIZ(A) DE DIREITO DA {VARA} DA COMARCA DE {CIDADE}/PR"></textarea></div>
+        <div class="fg full"><label class="fl">Fecho padrão (antes da assinatura)</label><textarea class="fi" id="tb-fecho" style="min-height:55px;" placeholder="Nestes termos,&#10;Pede deferimento.&#10;&#10;Curitiba, {DATA}."></textarea></div>
+      </div>
+    </div>
+
+    <!-- ABA MODELO DE PETIÇÃO -->
+    <div id="tb-tab-modelo" style="display:none;">
+      <div class="alert alert-g" style="margin-bottom:12px;">✦ O modelo abaixo é o texto base que será usado ao criar uma nova petição com este timbrado. Use {PARTES}, {FATOS}, {DATA}, {VARA}, {JUIZ} como variáveis.</div>
+      <div class="fg"><label class="fl">Nome do modelo (para buscar por nome)</label><input class="fi" id="tb-modelo-nome" placeholder="Ex: Contestação CDC — Cobrança Indevida"/></div>
+      <div class="fg"><label class="fl">Tipo de peça do modelo</label>
+        <select class="fi" id="tb-modelo-tipo">
+          <option value="">— Nenhum (só timbrado) —</option>
+          <option>Contestação</option><option>Petição Inicial</option><option>Recurso de Apelação</option>
+          <option>Embargos de Declaração</option><option>Impugnação</option><option>Contrarrazões</option>
+          <option>Manifestação</option><option>Petições Diversas</option><option>Contrato</option>
+          <option>Distrato</option><option>Parecer</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-top:4px;"><label class="fl">Texto do modelo</label>
+        <textarea class="fi" id="tb-modelo-texto" style="min-height:280px;font-family:'DM Mono',monospace;font-size:11.5px;" placeholder="Cole ou escreva o modelo de petição aqui...&#10;&#10;Use {PARTES}, {FATOS}, {DATA}, {VARA}, {CIDADE} como variáveis que serão substituídas automaticamente."></textarea>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:8px;">
+        <button class="btn btn-outline btn-xs" onclick="document.getElementById('tb-modelo-file').click()">↑ Importar modelo (.docx/.txt)</button>
+        <button class="btn btn-outline btn-xs" onclick="exportarModeloTimbrado()">↓ Exportar modelo (.txt)</button>
+        <input type="file" id="tb-modelo-file" accept=".docx,.txt" style="display:none;" onchange="importarModeloTimbrado(event)"/>
+      </div>
+    </div>
+
+    <!-- ABA PREVIEW -->
+    <div id="tb-tab-preview" style="display:none;">
+      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;font-weight:500;">Pré-visualização da petição</div>
+      <div id="tb-prev-box" style="background:#fff;border-radius:var(--r);padding:20px 28px;font-family:'Times New Roman',serif;font-size:12px;color:#111;border:1px solid var(--border2);line-height:1.9;">
+        <div id="tb-prev-header" style="text-align:center;border-bottom:2px solid #8a5070;padding-bottom:10px;margin-bottom:16px;"></div>
+        <div id="tb-prev-enderecamento" style="color:#444;font-size:11.5px;margin-bottom:14px;"></div>
+        <div style="color:#777;font-size:11px;margin-bottom:8px;">[ Qualificação das partes ]</div>
+        <div style="color:#555;font-size:11px;">[ Dos Fatos ] Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nullam vehicula ipsum a arcu cursus vitae congue mauris.</div>
+        <div style="margin-top:14px;" id="tb-prev-fecho"></div>
+        <div style="margin-top:20px;text-align:right;font-size:11px;color:#333;">______________________________<br/>Advogado — OAB/PR 00.000</div>
+        <div id="tb-prev-rodape" style="text-align:center;font-size:9px;color:#aaa;border-top:1px solid #ddd;margin-top:20px;padding-top:6px;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-timbrado')">Cancelar</button><button class="btn btn-gold" onclick="saveTimbrado()">Salvar timbrado</button></div>
+</div>
+</div>
+
+<!-- MODAL NOVO USUÁRIO -->
+<div class="ov" id="modal-novo-user">
+<div class="modal" style="max-width:400px;">
+  <div class="mh"><div class="mt">Novo Usuário</div><button class="mc" onclick="closeModal('modal-novo-user')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">Nome</label><input class="fi" id="nu-nome" placeholder="Nome completo"/></div>
+    <div class="fg"><label class="fl">Usuário / email</label><input class="fi" id="nu-user" placeholder="usuario ou email@"/></div>
+    <div class="fg"><label class="fl">Senha</label><input class="fi" type="password" id="nu-pass" placeholder="Mínimo 6 caracteres"/></div>
+    <div class="fg"><label class="fl">Perfil</label><select class="fi" id="nu-role"><option value="user">Usuário</option><option value="admin">Administrador</option></select></div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-novo-user')">Cancelar</button><button class="btn btn-gold" onclick="saveNewUser()">Criar usuário</button></div>
+</div>
+</div>
+
+<!-- MODAL USER MENU -->
+<div class="ov" id="modal-user-menu">
+<div class="modal" style="max-width:300px;">
+  <div class="mh"><div class="mt" id="um-nome">—</div><button class="mc" onclick="closeModal('modal-user-menu')">✕</button></div>
+  <div class="mb">
+    <div id="um-info" style="font-size:12px;color:var(--text2);margin-bottom:14px;"></div>
+    <button class="btn btn-outline" style="width:100%;margin-bottom:7px;" onclick="openModal('modal-change-pass');closeModal('modal-user-menu')">Alterar senha</button>
+    <button class="btn btn-danger" style="width:100%;" onclick="doLogout()">Sair</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL ALTERAR SENHA -->
+<div class="ov" id="modal-change-pass">
+<div class="modal" style="max-width:360px;">
+  <div class="mh"><div class="mt">Alterar Senha</div><button class="mc" onclick="closeModal('modal-change-pass')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">Senha atual</label><input class="fi" type="password" id="cp-atual"/></div>
+    <div class="fg"><label class="fl">Nova senha</label><input class="fi" type="password" id="cp-nova"/></div>
+    <div class="fg"><label class="fl">Confirmar nova senha</label><input class="fi" type="password" id="cp-conf"/></div>
+    <div id="cp-err" style="font-size:11.5px;color:var(--rd2);margin-top:6px;display:none;"></div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-change-pass')">Cancelar</button><button class="btn btn-gold" onclick="changePass()">Salvar</button></div>
+</div>
+</div>
+
+<!-- MODAL BACKUP RESTAURAR -->
+<div class="ov" id="modal-import-backup">
+<div class="modal" style="max-width:480px;">
+  <div class="mh"><div class="mt">Restaurar Backup</div><button class="mc" onclick="closeModal('modal-import-backup')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;">
+      <strong>Como funciona o backup vitalício:</strong><br/>
+      O sistema salva automaticamente seus dados no navegador. Para garantir que nunca perca nada:<br/>
+      1. Clique em <strong>Backup</strong> regularmente para baixar um arquivo .json<br/>
+      2. Salve esse arquivo no computador, Google Drive ou Dropbox<br/>
+      3. Se precisar recuperar, use este botão para restaurar
+    </div>
+    <div style="background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:12px;">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:600;">Último backup automático:</div>
+      <div style="font-size:12px;color:var(--text);" id="last-backup-date">—</div>
+    </div>
+    <div class="drop-zone" style="padding:20px;" onclick="document.getElementById('restore-file-inp').click()">
+      <input type="file" id="restore-file-inp" accept=".json" style="display:none;" onchange="importBib(event)"/>
+      <div style="font-size:20px;opacity:.4;margin-bottom:6px;">📂</div>
+      <div style="font-size:13px;color:var(--text2);font-weight:500;">Clique para selecionar o arquivo de backup</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px;">.json exportado pelo LexBase</div>
+    </div>
+    <div style="margin-top:12px;text-align:center;">
+      <button class="btn btn-outline btn-sm" onclick="showOfflineGuide()">📴 Como usar offline?</button>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-import-backup')">Fechar</button>
+  </div>
+</div>
+</div></div>
+
+<!-- IA SELECTION POPUP -->
+<div id="sel-popup" style="display:none;position:fixed;z-index:500;background:rgba(255,248,246,0.98);border:1px solid rgba(180,100,90,0.22);border-radius:var(--r2);padding:12px;box-shadow:0 4px 32px rgba(160,80,70,0.20);min-width:230px;">
+  <div style="font-size:9.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-weight:700;">✦ IA — Trecho selecionado</div>
+  <div class="sel-opt" onclick="iaSelAction('reescrever')">✏ Reescrever com clareza</div>
+  <div class="sel-opt" onclick="iaSelAction('tecnico')">⚖ Tornar mais técnico</div>
+  <div class="sel-opt" onclick="iaSelAction('fundamentar')">📚 Adicionar fundamentação</div>
+  <div class="sel-opt" onclick="iaSelAction('resumir')">✂ Resumir</div>
+  <div class="sel-opt" onclick="iaSelAction('revisar')">🔎 Revisar gramática/redação</div>
+  <div class="sel-opt" onclick="iaSelAction('contrapor')">🔄 Contrapor alegação contrária</div>
+  <div class="sel-opt" onclick="iaSelAction('expandir')">📝 Expandir / Detalhar</div>
+  <div style="border-top:1px solid var(--border);margin-top:7px;padding-top:8px;">
+    <div style="font-size:9.5px;color:var(--text3);font-weight:700;margin-bottom:5px;">✦ Instrução personalizada:</div>
+    <textarea id="ia-custom-txt" class="fi" style="min-height:55px;font-size:11.5px;margin-bottom:5px;resize:none;" placeholder="Ex: reescreva em linguagem mais formal e técnica..."></textarea>
+    <button class="btn btn-gold btn-xs" style="width:100%;" onclick="iaSelCustom()">Executar instrução</button>
+  </div>
+  <div class="sel-opt" onclick="closeSelPopup()" style="color:var(--text3);border-top:1px solid var(--border);margin-top:6px;padding-top:7px;font-size:11px;">✕ Cancelar</div>
+</div></div>
+
+<iframe id="print-frame" style="display:none;"></iframe>
+
+
+
+<!-- MODAL EXPORTAR PETIÇÃO -->
+<div class="ov" id="modal-export">
+<div class="modal" style="max-width:420px;">
+  <div class="mh"><div class="mt">Exportar Petição</div><button class="mc" onclick="closeModal('modal-export')">✕</button></div>
+  <div class="mb">
+    <div style="font-size:12.5px;color:var(--text2);margin-bottom:16px;">Escolha o formato de saída:</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px;">
+      <div class="export-opt" id="exp-opt-doc" onclick="selectExport('doc')" style="background:var(--bg3);border:2px solid var(--border2);border-radius:var(--r2);padding:14px;text-align:center;cursor:pointer;transition:all .15s;">
+        <div style="font-size:22px;margin-bottom:6px;">📄</div>
+        <div style="font-size:12px;font-weight:500;">.DOC</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Word / LibreOffice</div>
+      </div>
+      <div class="export-opt" id="exp-opt-pdf" onclick="selectExport('pdf')" style="background:var(--bg3);border:2px solid var(--border2);border-radius:var(--r2);padding:14px;text-align:center;cursor:pointer;transition:all .15s;">
+        <div style="font-size:22px;margin-bottom:6px;">📕</div>
+        <div style="font-size:12px;font-weight:500;">PDF</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Imprimir como PDF</div>
+      </div>
+      <div class="export-opt" id="exp-opt-txt" onclick="selectExport('txt')" style="background:var(--bg3);border:2px solid var(--border2);border-radius:var(--r2);padding:14px;text-align:center;cursor:pointer;transition:all .15s;">
+        <div style="font-size:22px;margin-bottom:6px;">📃</div>
+        <div style="font-size:12px;font-weight:500;">.TXT</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px;">Texto simples</div>
+      </div>
+    </div>
+    <div class="fg"><label class="fl">Nome do arquivo</label><input class="fi" id="exp-filename" placeholder="Nome da petição"/></div>
+    <div class="fg"><label class="fl">Timbrado</label><select class="fi" id="exp-timbrado"><option value="">— Sem timbrado —</option></select></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-export')">Cancelar</button>
+    <button class="btn btn-gold" onclick="doExport()">Exportar</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL IMPORTAR DJe / TRIBUNAIS -->
+<div class="ov" id="modal-dje">
+<div class="modal" style="max-width:600px;">
+  <div class="mh"><div class="mt">Importar Prazos — DJe / Tribunais</div><button class="mc" onclick="closeModal('modal-dje')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;">✦ Busca suas intimações e citações no Diário da Justiça Eletrônico pelo nome do advogado ou número da OAB.</div>
+    <div class="g2">
+      <div class="fg"><label class="fl">Nome do advogado</label><input class="fi" id="dje-nome" placeholder="Ex: Tatiani Fabi"/></div>
+      <div class="fg"><label class="fl">OAB / Número</label><input class="fi" id="dje-oab" placeholder="Ex: PR 12345"/></div>
+      <div class="fg full"><label class="fl">Tribunais para buscar</label>
+        <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;" id="dje-tribunais-check">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="dje-tjpr" checked/> TJPR</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="dje-tjsp"/> TJSP</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="dje-tjrj"/> TJRJ</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="dje-tjmg"/> TJMG</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="dje-stj"/> STJ</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;"><input type="checkbox" id="dje-trt9"/> TRT-9ª</label>
+        </div>
+      </div>
+      <div class="fg"><label class="fl">Data da publicação</label><input class="fi" type="date" id="dje-data"/></div>
+      <div class="fg"><label class="fl">Prazo em dias úteis</label><input class="fi" type="number" id="dje-prazo-dias" value="15" min="1" max="60"/></div>
+    </div>
+    <button class="btn btn-gold btn-sm" style="width:100%;margin-top:4px;" onclick="buscarDJe()">🔍 Buscar intimações</button>
+    <div id="dje-results" style="margin-top:12px;"></div>
+    <div id="dje-import-list" style="margin-top:10px;"></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-dje')">Fechar</button>
+    <button class="btn btn-gold" id="dje-import-btn" onclick="importarDJePrazos()" style="display:none;">↓ Importar prazos selecionados</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL IMPORTAR AGENDA CPJ / PLANILHA -->
+<div class="ov" id="modal-cpj">
+<div class="modal" style="max-width:560px;">
+  <div class="mh"><div class="mt">Importar Agenda — CPJ / Planilha</div><button class="mc" onclick="closeModal('modal-cpj')">✕</button></div>
+  <div class="mb">
+    <div style="display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);">
+      <button class="tb-btn active" id="cpj-tab-plan-btn" onclick="switchCpjTab('plan')" style="padding:6px 12px;font-size:12px;">📊 Planilha CSV/Excel</button>
+      <button class="tb-btn" id="cpj-tab-cpj-btn" onclick="switchCpjTab('cpj')" style="padding:6px 12px;font-size:12px;">⚖ CPJ / Manual</button>
+    </div>
+    <div id="cpj-tab-plan">
+      <div class="alert alert-b" style="margin-bottom:12px;">Importe uma planilha (.csv) com colunas: Data, Hora, Descrição, Local, Processo (opcional).</div>
+      <div class="drop-zone" style="padding:20px;" onclick="document.getElementById('cpj-file').click()">
+        <input type="file" id="cpj-file" accept=".csv,.xlsx,.xls" style="display:none;" onchange="importarPlanilhaAgenda(event)"/>
+        <div style="font-size:22px;opacity:.4;margin-bottom:6px;">📊</div>
+        <div style="font-size:12.5px;color:var(--text2);">Clique para selecionar CSV ou Excel</div>
+      </div>
+      <div class="fg" style="margin-top:12px;"><label class="fl">Modelo de planilha esperado</label>
+        <div style="background:var(--bg3);border-radius:var(--r);padding:8px 11px;font-family:'DM Mono',monospace;font-size:10.5px;color:var(--text2);">Data,Hora,Descrição,Local,Processo<br/>15/06/2025,09:00,Audiência conciliação,3ª Vara Cível,0001234-56.2024.8.16</div>
+      </div>
+      <button class="btn btn-outline btn-xs" style="margin-top:8px;" onclick="downloadModeloPlanilha()">↓ Baixar modelo de planilha</button>
+    </div>
+    <div id="cpj-tab-cpj" style="display:none;">
+      <div class="alert alert-b" style="margin-bottom:12px;">Adicione audiências manualmente ou cole dados copiados do CPJ/sistema do tribunal.</div>
+      <textarea class="fi" id="cpj-texto" style="min-height:120px;" placeholder="Cole aqui os dados copiados do CPJ ou sistema do tribunal. Ex:&#10;15/06/2025 09:00 - Audiência de Instrução - 3ª Vara Cível - Proc. 0001234&#10;22/06/2025 14:30 - Audiência de Conciliação - JEC - Proc. 0005678"></textarea>
+      <button class="btn btn-gold btn-sm" style="margin-top:8px;width:100%;" onclick="parseCpjTexto()">Processar e importar</button>
+    </div>
+    <div id="cpj-preview" style="margin-top:12px;"></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-cpj')">Fechar</button>
+    <button class="btn btn-gold" id="cpj-import-btn" onclick="confirmarImportAgenda()" style="display:none;">↓ Importar audiências</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL BUSCAR MODELO POR NOME -->
+<div class="ov" id="modal-buscar-modelo">
+<div class="modal" style="max-width:560px;">
+  <div class="mh"><div class="mt">Buscar Modelo pelo Nome</div><button class="mc" onclick="closeModal('modal-buscar-modelo')">✕</button></div>
+  <div class="mb">
+    <div class="fg"><label class="fl">Nome da petição ou timbrado</label>
+      <input class="fi" id="bm-q" placeholder="Ex: Contestação CDC cobrança indevida" oninput="buscarModelos()" autofocus/>
+    </div>
+    <div id="bm-results" style="margin-top:10px;max-height:360px;overflow-y:auto;"></div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-buscar-modelo')">Fechar</button></div>
+</div>
+</div>
+
+
+<!-- MODAL GUIA OFFLINE -->
+<div class="ov" id="modal-offline-guide">
+<div class="modal" style="max-width:460px;">
+  <div class="mh">
+    <div class="mt">📴 Guia de Uso Offline</div>
+    <button class="mc" onclick="closeModal('modal-offline-guide')">✕</button>
+  </div>
+  <div class="mb">
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div id="guide-status-dot" style="width:10px;height:10px;border-radius:50%;background:#5aaa84;flex-shrink:0;"></div>
+        <span id="guide-status-txt" style="font-size:13px;font-weight:700;color:var(--text);">Online</span>
+      </div>
+    </div>
+
+    <div style="background:rgba(74,122,88,0.08);border:1px solid rgba(74,122,88,0.20);border-radius:var(--r);padding:12px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gr2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">✓ Funciona offline</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="font-size:12.5px;color:var(--text);">📝 Redigir petições</div>
+        <div style="font-size:12.5px;color:var(--text);">📚 Biblioteca de peças</div>
+        <div style="font-size:12.5px;color:var(--text);">⏰ Controle de prazos</div>
+        <div style="font-size:12.5px;color:var(--text);">📅 Agenda de audiências</div>
+        <div style="font-size:12.5px;color:var(--text);">👥 Gestão de clientes</div>
+        <div style="font-size:12.5px;color:var(--text);">📂 Biblioteca e pastas</div>
+        <div style="font-size:12.5px;color:var(--text);">🗒 Visual Law / Timbrados</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(204,68,68,0.08);border:1px solid rgba(204,68,68,0.20);border-radius:var(--r);padding:12px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--rd2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">❌ Requer internet</div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div style="font-size:12.5px;color:var(--text);">✦ Pesquisa jurídica com IA</div>
+        <div style="font-size:12.5px;color:var(--text);">✦ Busca de intimações no DJe</div>
+        <div style="font-size:12.5px;color:var(--text);">✦ Preparação de audiência com IA</div>
+        <div style="font-size:12.5px;color:var(--text);">✦ Reescrita de texto com IA</div>
+      </div>
+    </div>
+
+    <div style="background:rgba(154,96,96,0.08);border:1px solid rgba(154,96,96,0.18);border-radius:var(--r);padding:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--gold);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em;">💾 Dica de backup</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;">Clique em <strong>💾 Backup</strong> regularmente e salve o arquivo no seu computador, Google Drive ou pen drive. Se trocar de dispositivo ou limpar o navegador, use <strong>↑ Restaurar</strong> para recuperar tudo.</div>
+      <button class="btn btn-gold btn-sm" style="width:100%;margin-top:10px;" onclick="exportBib();closeModal('modal-offline-guide')">💾 Fazer backup agora</button>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-offline-guide')">Fechar</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL CONFIGURAR GOOGLE DRIVE -->
+<div class="ov" id="modal-gdrive-setup">
+<div class="modal" style="max-width:520px;">
+  <div class="mh"><div class="mt">☁ Sincronizar com Google Drive</div><button class="mc" onclick="closeModal('modal-gdrive-setup')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;">
+      Com o Google Drive, seus dados ficam salvos na sua conta Google e sincronizam automaticamente em <strong>qualquer computador ou dispositivo</strong>.
+    </div>
+
+    <div style="background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;">Como configurar (1 vez apenas):</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:9px;align-items:flex-start;">
+          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#9a6060,#b07878);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">1</div>
+          <div style="font-size:12px;color:var(--text);">Acesse <a href="https://console.cloud.google.com/" target="_blank" style="color:#9a6060;font-weight:600;">console.cloud.google.com</a></div>
+        </div>
+        <div style="display:flex;gap:9px;align-items:flex-start;">
+          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#9a6060,#b07878);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+          <div style="font-size:12px;color:var(--text);">Crie um projeto → APIs → Ative <strong>Google Drive API</strong></div>
+        </div>
+        <div style="display:flex;gap:9px;align-items:flex-start;">
+          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#9a6060,#b07878);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+          <div style="font-size:12px;color:var(--text);">Credenciais → Criar credencial → <strong>ID do cliente OAuth 2.0</strong> → Aplicativo Web</div>
+        </div>
+        <div style="display:flex;gap:9px;align-items:flex-start;">
+          <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#9a6060,#b07878);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">4</div>
+          <div style="font-size:12px;color:var(--text);">Cole o <strong>Client ID</strong> abaixo e clique em Conectar</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="fl">Client ID do Google OAuth 2.0</label>
+      <input class="fi" id="gdrive-client-id-inp" placeholder="000000000000-xxxxxxxxxxxxxxxx.apps.googleusercontent.com" style="font-family:'DM Mono',monospace;font-size:11px;"/>
+    </div>
+
+    <div style="background:rgba(88,104,170,0.08);border:1px solid rgba(88,104,170,0.20);border-radius:var(--r);padding:10px 12px;font-size:11.5px;color:var(--bl2);">
+      💡 Seus dados ficam salvos em uma pasta privada do seu Google Drive (<strong>appDataFolder</strong>) — invisível para outros aplicativos e só acessível pelo LexBase.
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-gdrive-setup')">Cancelar</button>
+    <button class="btn btn-gold" onclick="saveGDriveClientId()">☁ Conectar ao Drive</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL RECUPERAR SENHA -->
+<div class="ov" id="modal-recover-pass">
+<div class="modal" style="max-width:420px;">
+  <div class="mh"><div class="mt">Recuperar Senha</div><button class="mc" onclick="closeModal('modal-recover-pass')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;">
+      Para recuperar sua senha, envie um email para o administrador do sistema ou redefina diretamente abaixo se tiver acesso aos emails cadastrados.
+    </div>
+
+    <!-- Opção 1: enviar email -->
+    <div style="background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r2);padding:13px;margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;">Opção 1 — Enviar email</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Envie um email de recuperação para os endereços vinculados à conta:</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <a href="mailto:tatiani.fabi@live.com?subject=LexBase - Recuperar Senha&body=Preciso redefinir minha senha do LexBase." style="display:flex;align-items:center;gap:8px;padding:8px 11px;background:rgba(154,96,96,0.08);border:1px solid rgba(154,96,96,0.18);border-radius:var(--r);text-decoration:none;color:var(--text);font-size:12px;font-weight:500;">
+          <span style="font-size:14px;">✉</span> tatiani.fabi@live.com
+        </a>
+        <a href="mailto:tatianifabi@gmail.com?subject=LexBase - Recuperar Senha&body=Preciso redefinir minha senha do LexBase." style="display:flex;align-items:center;gap:8px;padding:8px 11px;background:rgba(154,96,96,0.08);border:1px solid rgba(154,96,96,0.18);border-radius:var(--r);text-decoration:none;color:var(--text);font-size:12px;font-weight:500;">
+          <span style="font-size:14px;">✉</span> tatianifabi@gmail.com
+        </a>
+      </div>
+    </div>
+
+    <!-- Opção 2: redefinir senha diretamente -->
+    <div style="background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r2);padding:13px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.09em;margin-bottom:10px;">Opção 2 — Redefinir senha agora</div>
+      <div class="fg"><label class="fl">Nova senha</label>
+        <input class="fi" type="password" id="recover-nova" placeholder="Digite a nova senha (mín. 6 caracteres)"/>
+      </div>
+      <div class="fg"><label class="fl">Confirmar nova senha</label>
+        <input class="fi" type="password" id="recover-conf" placeholder="Repita a nova senha"/>
+      </div>
+      <div id="recover-err" style="font-size:11.5px;color:var(--rd2);display:none;margin-bottom:8px;font-weight:500;"></div>
+      <button class="btn btn-gold" style="width:100%;" onclick="resetSenha()">Redefinir senha</button>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:7px;text-align:center;">
+        Apenas o administrador (tatiani) pode redefinir sem senha atual.
+      </div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-recover-pass')">Fechar</button></div>
+</div>
+</div>
+
+
+<!-- MODAL RENOMEAR/MOVER PEÇA -->
+<div class="ov" id="modal-rename-peca">
+<div class="modal" style="max-width:500px;">
+  <div class="mh"><div class="mt">Editar peça</div><button class="mc" onclick="closeModal('modal-rename-peca')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg full"><label class="fl">Título</label>
+        <input class="fi" id="rn-titulo" placeholder="Título da peça"/>
+      </div>
+      <div class="fg"><label class="fl">Tipo</label>
+        <select class="fi" id="rn-tipo">
+          <option>Contestação</option><option>Petição Inicial</option><option>Recurso de Apelação</option>
+          <option>Agravo de Instrumento</option><option>Agravo Interno</option><option>Embargos de Declaração</option>
+          <option>Impugnação</option><option>Contrarrazões</option><option>Manifestação</option>
+          <option>Petições Diversas</option><option>Contrato</option><option>Distrato</option><option>Parecer</option><option>Outros</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Área</label>
+        <select class="fi" id="rn-area">
+          <option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option>
+          <option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Resultado</label>
+        <select class="fi" id="rn-resultado">
+          <option>Pendente</option><option>Ganho</option><option>Perda</option>
+        </select>
+      </div>
+      <div class="fg full"><label class="fl">Tese jurídica</label>
+        <input class="fi" id="rn-tese" placeholder="Argumento central"/>
+      </div>
+      <div class="fg full">
+        <label class="fl">Mover para pasta</label>
+        <div style="display:flex;gap:7px;align-items:center;">
+          <select class="fi" id="rn-pasta" style="flex:1;">
+            <option value="">— Raiz (sem pasta) —</option>
+          </select>
+          <button class="btn btn-outline btn-xs" onclick="openModal('modal-pasta');closeModal('modal-rename-peca');" title="Criar nova pasta">+ Pasta</button>
+        </div>
+      </div>
+      <div class="fg full">
+        <label class="fl">Vincular a cliente</label>
+        <select class="fi" id="rn-caso">
+          <option value="">— Nenhum —</option>
+        </select>
+      </div>
+      <div class="fg full"><label class="fl">Observações</label>
+        <textarea class="fi" id="rn-obs" style="min-height:55px;" placeholder="Contexto, cliente, tribunal..."></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-danger btn-sm" onclick="delPecaFromRename()">🗑 Excluir</button>
+    <button class="btn btn-outline" onclick="closeModal('modal-rename-peca')">Cancelar</button>
+    <button class="btn btn-gold" onclick="saveRenamePeca()">Salvar alterações</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL IMPORTAR — DESTINO -->
+<div class="ov" id="modal-import-destino">
+<div class="modal" style="max-width:540px;">
+  <div class="mh"><div class="mt">Onde salvar os documentos?</div><button class="mc" onclick="closeModal('modal-import-destino')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;" id="imp-dest-info">Escolha onde salvar os arquivos importados.</div>
+    <div style="display:flex;gap:10px;margin-bottom:14px;">
+      <div id="imp-dest-bib" onclick="setImpDest('biblioteca')" style="flex:1;border:2px solid var(--gold);background:rgba(154,96,96,0.08);border-radius:var(--r2);padding:14px;text-align:center;cursor:pointer;">
+        <div style="font-size:22px;margin-bottom:6px;">📚</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);">Biblioteca</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">Banco de peças por tipo e área</div>
+      </div>
+      <div id="imp-dest-cliente" onclick="setImpDest('cliente')" style="flex:1;border:2px solid var(--border2);background:rgba(255,248,246,0.80);border-radius:var(--r2);padding:14px;text-align:center;cursor:pointer;">
+        <div style="font-size:22px;margin-bottom:6px;">👥</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);">Pasta de Cliente</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px;">Documentos por cliente e ação</div>
+      </div>
+    </div>
+
+    <!-- Opções biblioteca -->
+    <div id="imp-dest-bib-opts" style="background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r2);padding:13px;margin-bottom:12px;">
+      <div class="fg"><label class="fl">Pasta da biblioteca</label>
+        <div style="display:flex;gap:7px;">
+          <select class="fi" id="imp-pasta-sel" style="flex:1;"><option value="">— Raiz —</option></select>
+          <button class="btn btn-outline btn-xs" onclick="criarPastaRapida()">+ Nova pasta</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Opções cliente -->
+    <div id="imp-dest-cli-opts" style="display:none;background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r2);padding:13px;margin-bottom:12px;">
+      <div class="fg"><label class="fl">Cliente</label>
+        <div style="display:flex;gap:7px;">
+          <select class="fi" id="imp-cliente-sel" style="flex:1;" onchange="updateAcoesSel()"><option value="">— Selecionar —</option></select>
+          <button class="btn btn-outline btn-xs" onclick="openModal('modal-caso')">+ Novo</button>
+        </div>
+      </div>
+      <div class="fg" id="imp-acao-wrap"><label class="fl">Ação / Processo</label>
+        <div style="display:flex;gap:7px;">
+          <select class="fi" id="imp-acao-sel" style="flex:1;"><option value="">— Selecionar ação —</option></select>
+          <button class="btn btn-outline btn-xs" onclick="addAcaoRapida()">+ Nova ação</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lista de arquivos para categorizar -->
+    <div id="imp-dest-files-list" style="max-height:220px;overflow-y:auto;"></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-import-destino')">Cancelar</button>
+    <button class="btn btn-gold" onclick="confirmarImportDestino()">↓ Importar arquivos</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL RELATÓRIO -->
+<div class="ov" id="modal-relatorio-caso">
+<div class="modal" style="max-width:620px;">
+  <div class="mh">
+    <div class="mt" id="rel-title">Relatório</div>
+    <button class="mc" onclick="closeModal('modal-relatorio-caso')">✕</button>
+  </div>
+  <div class="mb">
+    <div id="rel-output" style="background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r);padding:16px;font-size:12.5px;line-height:1.7;color:var(--text);min-height:200px;max-height:60vh;overflow-y:auto;white-space:pre-wrap;font-family:'Nunito',sans-serif;">Gerando...</div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-relatorio-caso')">Fechar</button>
+    <button class="btn btn-gold" onclick="exportarRelatorio()">↓ Exportar .txt</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL CONFIRMAÇÃO CUSTOMIZADO -->
+<div class="ov" id="modal-confirm" style="z-index:9999!important;">
+<div class="modal" style="max-width:380px;text-align:center;">
+  <div class="mb" style="padding:28px 24px 16px;">
+    <div style="font-size:32px;margin-bottom:12px;" id="confirm-icon">⚠️</div>
+    <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px;" id="confirm-title">Confirmar</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.5;" id="confirm-msg">Tem certeza?</div>
+  </div>
+  <div class="mf" style="justify-content:center;gap:10px;">
+    <button class="btn btn-outline" id="confirm-cancel-btn" style="min-width:100px;">Cancelar</button>
+    <button class="btn" id="confirm-ok-btn" style="min-width:100px;background:rgba(204,68,68,0.85);border-color:transparent;color:#fff;">Confirmar</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL GERAR PETIÇÃO COM IA -->
+<div class="ov" id="modal-gerar-peticao">
+<div class="modal" style="max-width:700px;">
+  <div class="mh">
+    <div class="mt">✦ Gerar Petição com IA</div>
+    <button class="mc" onclick="closeModal('modal-gerar-peticao')">✕</button>
+  </div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg"><label class="fl">Tipo de peça</label>
+        <select class="fi" id="gen-tipo">
+          <option>Contestação</option><option>Petição Inicial</option>
+          <option>Recurso de Apelação</option><option>Recurso Inominado</option>
+          <option>Contrarrazões</option><option>Alegações Finais</option>
+          <option>Agravo de Instrumento</option><option>Embargos de Declaração</option>
+          <option>Manifestação</option><option>Impugnação</option><option>Habeas Corpus</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Área do direito</label>
+        <select class="fi" id="gen-area">
+          <option>Direito do Consumidor</option><option>Direito Bancário</option>
+          <option>Direito Civil</option><option>Direito de Família</option>
+          <option>Direito Trabalhista</option><option>Direito Penal</option>
+          <option>Juizado Especial Civil</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Caso vinculado (opcional)</label>
+        <select class="fi" id="gen-caso"><option value="">— Nenhum —</option></select>
+      </div>
+    </div>
+    <div class="fg" style="margin-top:10px;"><label class="fl">Fatos principais *</label>
+      <textarea class="fi" id="gen-fatos" style="min-height:90px;" placeholder="Descreva os fatos: quem são as partes, o que aconteceu, qual o problema, datas relevantes..."></textarea>
+    </div>
+    <div class="fg" style="margin-top:8px;"><label class="fl">Pedidos principais</label>
+      <textarea class="fi" id="gen-pedidos" style="min-height:60px;" placeholder="Ex: Declaração de inexistência de débito, indenização por dano moral de R$ 5.000..."></textarea>
+    </div>
+    <div id="gen-output" style="display:none;background:rgba(255,248,246,0.90);border:1px solid var(--border);border-radius:var(--r);margin-top:10px;max-height:350px;overflow-y:auto;"></div>
+    <button id="gen-use-btn" class="btn btn-gold" onclick="usarPeticaoGerada()" style="display:none;width:100%;margin-top:10px;">↗ Usar no Editor</button>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-gerar-peticao')">Fechar</button>
+    <button class="btn btn-gold" id="gen-btn" onclick="gerarPeticaoIA()">✦ Gerar com IA</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL GERAR PETIÇÃO COM IA -->
+<div class="ov" id="modal-gerar-peticao">
+<div class="modal" style="max-width:640px;">
+  <div class="mh"><div class="mt">✦ Gerar Petição com IA</div><button class="mc" onclick="closeModal('modal-gerar-peticao')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg"><label class="fl">Tipo de peça</label>
+        <select class="fi" id="ia-gen-tipo">
+          <option>Contestação</option><option>Petição Inicial</option><option>Recurso de Apelação</option>
+          <option>Recurso Inominado</option><option>Agravo de Instrumento</option><option>Embargos de Declaração</option>
+          <option>Contrarrazões</option><option>Alegações Finais</option><option>Mandado de Segurança</option>
+          <option>Habeas Corpus</option><option>Impugnação</option><option>Manifestação</option>
+          <option>Notificação Extrajudicial</option><option>Petições Diversas</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Área do direito</label>
+        <select class="fi" id="ia-gen-area">
+          <option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option>
+          <option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option>
+          <option>Juizado Especial Civil</option>
+        </select>
+      </div>
+      <div class="fg full"><label class="fl">Partes (opcional)</label>
+        <input class="fi" id="ia-gen-partes" placeholder="Ex: João da Silva (autor) × Banco XYZ (réu)"/>
+      </div>
+      <div class="fg full"><label class="fl">Fatos principais *</label>
+        <textarea class="fi" id="ia-gen-fatos" style="min-height:90px;" placeholder="Descreva os fatos do caso em linguagem simples. A IA vai estruturar juridicamente..."></textarea>
+      </div>
+      <div class="fg full"><label class="fl">Pedidos (opcional)</label>
+        <textarea class="fi" id="ia-gen-pedidos" style="min-height:55px;" placeholder="Ex: condenação ao pagamento de R$ 5.000 por danos morais + restituição de valores..."></textarea>
+      </div>
+    </div>
+    <div id="ia-gen-out" style="display:none;margin-top:12px;background:rgba(255,248,246,0.92);border:1px solid var(--border);border-radius:var(--r);padding:14px;font-size:12px;line-height:1.75;color:var(--text);max-height:300px;overflow-y:auto;white-space:pre-wrap;font-family:'Nunito',sans-serif;"></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-gerar-peticao')">Fechar</button>
+    <button id="ia-gen-btn" class="btn btn-gold" onclick="gerarPeticaoIA()">✦ Gerar petição</button>
+    <button class="btn btn-outline" id="ia-usar-btn" onclick="usarPeticaoGerada()" style="display:none;">↗ Usar no editor</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL BUSCA GLOBAL -->
+<div class="ov" id="modal-busca-global">
+<div class="modal" style="max-width:560px;">
+  <div class="mh"><div class="mt">🔍 Busca Global</div><button class="mc" onclick="closeModal('modal-busca-global')">✕</button></div>
+  <div class="mb">
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <input class="fi" id="busca-global-inp" placeholder="Buscar em tudo..." style="flex:1;" onkeydown="if(event.key==='Enter')doBuscaGlobal()"/>
+      <button class="btn btn-gold" onclick="doBuscaGlobal()">Buscar</button>
+    </div>
+    <div id="busca-global-results" style="max-height:60vh;overflow-y:auto;"></div>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL ICS INSTRUÇÕES -->
+<div class="ov" id="modal-ics-instrucoes">
+<div class="modal" style="max-width:520px;">
+  <div class="mh"><div class="mt">📅 Arquivo .ics baixado!</div><button class="mc" onclick="closeModal('modal-ics-instrucoes')">✕</button></div>
+  <div class="mb">
+    <div class="alert alert-g" style="margin-bottom:14px;font-size:12.5px;line-height:1.6;">
+      ✓ Arquivo baixado com sucesso! Importe no seu calendário para receber lembretes automáticos.
+    </div>
+
+    <!-- Configurar lembrete -->
+    <div style="background:rgba(255,248,246,0.80);border:1px solid var(--border);border-radius:var(--r2);padding:13px;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">⏰ Configurar lembrete de audiência</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select class="fi" id="lembrete-min-sel" style="max-width:180px;">
+          <option value="10">10 minutos antes</option>
+          <option value="15">15 minutos antes</option>
+          <option value="30">30 minutos antes</option>
+          <option value="60" selected>1 hora antes</option>
+          <option value="120">2 horas antes</option>
+          <option value="1440">1 dia antes</option>
+        </select>
+        <button class="btn btn-gold btn-xs" onclick="salvarLembreteMin()">Salvar e re-exportar</button>
+      </div>
+      <div style="font-size:10.5px;color:var(--text3);margin-top:6px;">O lembrete configurado vale para a próxima exportação.</div>
+    </div>
+
+    <!-- Instruções por plataforma -->
+    <div style="font-size:11px;color:var(--text2);line-height:1.75;">
+      <div style="font-weight:700;color:var(--text);margin-bottom:6px;">Como importar:</div>
+      <div style="background:rgba(255,255,255,0.60);border-radius:var(--r);padding:10px 12px;margin-bottom:6px;">
+        <strong>📱 Google Calendar</strong><br/>
+        Acesse calendar.google.com → ⚙ Configurações → <em>Importar e exportar</em> → Escolha o arquivo .ics → Importar
+      </div>
+      <div style="background:rgba(255,255,255,0.60);border-radius:var(--r);padding:10px 12px;margin-bottom:6px;">
+        <strong>🍎 Apple Calendar (Mac/iPhone)</strong><br/>
+        Abra o arquivo .ics diretamente — o Calendar abre automaticamente e pergunta em qual calendário salvar
+      </div>
+      <div style="background:rgba(255,255,255,0.60);border-radius:var(--r);padding:10px 12px;margin-bottom:6px;">
+        <strong>📧 Outlook</strong><br/>
+        Arquivo → Abrir e Exportar → Importar/Exportar → Importar arquivo iCalendar (.ics)
+      </div>
+      <div style="background:rgba(255,255,255,0.60);border-radius:var(--r);padding:10px 12px;">
+        <strong>📱 Android (qualquer app de calendário)</strong><br/>
+        Baixe o arquivo → toque nele no gerenciador de arquivos → escolha o app de calendário
+      </div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-gold" onclick="closeModal('modal-ics-instrucoes')">Entendido!</button></div>
+</div>
+</div>
+
+
+<!-- MODAL HONORÁRIO -->
+<div class="ov" id="modal-honorario">
+<div class="modal" style="max-width:580px;">
+  <div class="mh"><div class="mt" id="hon-title">Novo Honorário</div><button class="mc" onclick="closeModal('modal-honorario')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg"><label class="fl">Caso / Cliente</label><select class="fi" id="hon-caso"><option value="">— Avulso —</option></select></div>
+      <div class="fg"><label class="fl">Tipo</label>
+        <select class="fi" id="hon-tipo" onchange="onHonTipoChange()">
+          <option value="unico">Valor único</option>
+          <option value="parcelado">Parcelado</option>
+          <option value="mensal">Mensalidade fixa (recorrente)</option>
+          <option value="exito">Êxito</option>
+          <option value="consultoria">Consultoria</option>
+          <option value="outro">Outro</option>
+        </select>
+      </div>
+      <div class="fg full"><label class="fl">Descrição</label><input class="fi" id="hon-desc" placeholder="Ex: Contrato de honorários — Ação SHEIN"/></div>
+      <div class="fg"><label class="fl">Valor da parcela / mês (R$)</label><input class="fi" id="hon-valor" type="number" placeholder="0,00" step="0.01"/></div>
+      <div class="fg"><label class="fl">1º vencimento</label><input class="fi" id="hon-venc" type="date"/></div>
+
+      <!-- PARCELADO -->
+      <div id="hon-parcelas-wrap" style="display:none;grid-column:1/-1;">
+        <div style="height:1px;background:var(--border);margin:4px 0 8px;"></div>
+        <div style="font-size:10px;text-transform:uppercase;font-weight:700;color:var(--text3);letter-spacing:.09em;margin-bottom:8px;">Parcelamento</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="fg" style="margin-bottom:0;"><label class="fl">Nº de parcelas</label><input class="fi" id="hon-num-parcelas" type="number" min="2" max="60" placeholder="Ex: 6" value="3"/></div>
+          <div class="fg" style="margin-bottom:0;"><label class="fl">Dia de vencimento</label><input class="fi" id="hon-dia-venc" type="number" min="1" max="28" placeholder="Ex: 10" value="10"/></div>
+        </div>
+      </div>
+
+      <!-- MENSAL (recorrente) -->
+      <div id="hon-mensal-wrap" style="display:none;grid-column:1/-1;">
+        <div style="height:1px;background:var(--border);margin:4px 0 8px;"></div>
+        <div class="alert alert-g" style="font-size:11.5px;">🔁 Mensalidade recorrente — o sistema criará as cobranças mensalmente e alertará quando estiver em atraso.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;">
+          <div class="fg" style="margin-bottom:0;"><label class="fl">Dia de vencimento (todo mês)</label><input class="fi" id="hon-dia-mensal" type="number" min="1" max="28" placeholder="Ex: 5" value="5"/></div>
+          <div class="fg" style="margin-bottom:0;"><label class="fl">Meses a gerar à frente</label><input class="fi" id="hon-meses-gerar" type="number" min="1" max="24" value="3" placeholder="3"/></div>
+        </div>
+      </div>
+
+      <div class="fg"><label class="fl">Status</label>
+        <select class="fi" id="hon-status">
+          <option value="pendente">Pendente</option>
+          <option value="recebido">Recebido ✓</option>
+          <option value="atraso">Em atraso</option>
+          <option value="cancelado">Cancelado</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Data recebimento</label><input class="fi" id="hon-receb" type="date"/></div>
+      <div class="fg full"><label class="fl">Observações</label><input class="fi" id="hon-obs" placeholder="Forma de pagamento, notas..."/></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-honorario')">Cancelar</button><button class="btn btn-gold" onclick="saveHonorario()">Salvar</button></div>
+</div>
+</div>
+
+<!-- MODAL LEMBRETE RECORRENTE -->
+<div class="ov" id="modal-lembrete-rec">
+<div class="modal" style="max-width:500px;">
+  <div class="mh"><div class="mt">🔁 Lembrete Recorrente</div><button class="mc" onclick="closeModal('modal-lembrete-rec')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg full"><label class="fl">Descrição *</label><input class="fi" id="lrec-desc" placeholder="Ex: Manifestação mensal — Banco X"/></div>
+      <div class="fg"><label class="fl">Tipo</label><select class="fi" id="lrec-tipo"><option>Manifestação</option><option>Contestação</option><option>Petições Diversas</option><option>Outros</option></select></div>
+      <div class="fg"><label class="fl">Recorrência</label>
+        <select class="fi" id="lrec-freq">
+          <option value="semanal">Semanal</option>
+          <option value="quinzenal">Quinzenal</option>
+          <option value="mensal" selected>Mensal</option>
+          <option value="bimestral">Bimestral</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Dia do mês</label><input class="fi" id="lrec-dia" type="number" min="1" max="28" placeholder="Ex: 15"/></div>
+      <div class="fg"><label class="fl">Caso vinculado</label><select class="fi" id="lrec-caso"><option value="">— Nenhum —</option></select></div>
+      <div class="fg"><label class="fl">Nº do processo</label><input class="fi" id="lrec-num" placeholder="0001234-56.2024.8.16.0001"/></div>
+      <div class="fg full"><label class="fl">Observações</label><input class="fi" id="lrec-obs" placeholder="Notas sobre este lembrete recorrente..."/></div>
+    </div>
+  </div>
+  <div class="mf"><button class="btn btn-outline" onclick="closeModal('modal-lembrete-rec')">Cancelar</button><button class="btn btn-gold" onclick="saveLembreteRec()">Salvar</button></div>
+</div>
+</div>
+
+<!-- MODAL CERTIDÃO DE PRAZO -->
+<div class="ov" id="modal-certidao-prazo">
+<div class="modal" style="max-width:580px;">
+  <div class="mh"><div class="mt">📜 Certidão de Prazo</div><button class="mc" onclick="closeModal('modal-certidao-prazo')">✕</button></div>
+  <div class="mb">
+    <div id="certidao-conteudo" style="background:rgba(255,255,255,0.98);border:1px solid var(--border);border-radius:var(--r);padding:20px;font-size:12.5px;line-height:1.85;color:#1a1a1a;font-family:'Times New Roman',serif;min-height:200px;white-space:pre-wrap;"></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-certidao-prazo')">Fechar</button>
+    <button class="btn btn-outline" onclick="imprimirCertidao()">🖨 Imprimir</button>
+    <button class="btn btn-gold" onclick="baixarCertidao()">↓ Baixar .txt</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL NOVA TESE -->
+<div class="ov" id="modal-nova-tese">
+<div class="modal" style="max-width:620px;">
+  <div class="mh"><div class="mt">Nova Tese Jurídica</div><button class="mc" onclick="closeModal('modal-nova-tese')">✕</button></div>
+  <div class="mb">
+    <div class="g2">
+      <div class="fg full"><label class="fl">Título da tese *</label><input class="fi" id="tese-titulo" placeholder="Ex: Inversão do Ônus da Prova — CDC art. 6º, VIII"/></div>
+      <div class="fg"><label class="fl">Área</label>
+        <select class="fi" id="tese-area">
+          <option value="">— Geral —</option>
+          <option>Direito do Consumidor</option><option>Direito Bancário</option><option>Direito Civil</option>
+          <option>Direito de Família</option><option>Direito Trabalhista</option><option>Direito Penal</option>
+          <option>Juizado Especial Civil</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Tipo de peça</label>
+        <select class="fi" id="tese-tipo">
+          <option value="">— Qualquer —</option>
+          <option>Contestação</option><option>Petição Inicial</option><option>Recurso de Apelação</option>
+          <option>Alegações Finais</option><option>Todos</option>
+        </select>
+      </div>
+      <div class="fg full"><label class="fl">Resumo (1 linha para identificação rápida)</label>
+        <input class="fi" id="tese-resumo" placeholder="Ex: Aplica-se quando o consumidor não consegue provar o defeito por conta própria"/>
+      </div>
+      <div class="fg full"><label class="fl">Texto completo da tese *</label>
+        <textarea class="fi" id="tese-texto" style="min-height:200px;font-family:'Times New Roman',serif;font-size:13px;line-height:1.85;" placeholder="Cole aqui o bloco completo de fundamentação jurídica...&#10;&#10;Ex: &#34;O CDC, em seu art. 6º, inciso VIII, garante ao consumidor a inversão do ônus da prova, quando for verossímil a alegação ou quando for hipossuficiente...&#34;"></textarea>
+      </div>
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-nova-tese')">Cancelar</button>
+    <button class="btn btn-gold" onclick="saveTese()">Salvar tese</button>
+  </div>
+</div>
+</div>
+
+<!-- MODAL VER TESE -->
+<div class="ov" id="modal-ver-tese">
+<div class="modal" style="max-width:600px;">
+  <div class="mh"><div class="mt" id="tese-view-title">Tese</div><button class="mc" onclick="closeModal('modal-ver-tese')">✕</button></div>
+  <div class="mb">
+    <div id="tese-view-txt" style="background:rgba(255,255,255,0.98);border:1px solid var(--border);border-radius:var(--r);padding:18px;font-size:13px;line-height:1.85;color:#1a1a1a;font-family:'Times New Roman',serif;white-space:pre-wrap;max-height:60vh;overflow-y:auto;min-height:100px;"></div>
+  </div>
+  <div class="mf">
+    <button class="btn btn-outline" onclick="closeModal('modal-ver-tese')">Fechar</button>
+    <button class="btn btn-gold" onclick="usarTeseNoEditor(window._viewTeseIdx)">↗ Usar no editor</button>
+  </div>
+</div>
+</div>
+
+
+<!-- MODAL LEITURA DE DESPACHO -->
+<div class="ov" id="modal-despacho">
+<div class="modal" style="max-width:680px;max-height:92vh;">
+  <div class="mh">
+    <div>
+      <div class="mt">📋 Leitura de Despacho / Intimação</div>
+      <div style="font-size:11px;color:var(--text3);">A IA lê o despacho, resume, identifica o prazo e gera a resposta automaticamente</div>
+    </div>
+    <button class="mc" onclick="closeModal('modal-despacho')">✕</button>
+  </div>
+  <div class="mb" style="overflow-y:auto;">
+
+    <!-- TABS: Colar texto / Anexar arquivo -->
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px;">
+      <button id="desp-tab-texto" onclick="despachoTab('texto')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;background:transparent;cursor:pointer;color:#9a4040;border-bottom:2px solid #9a4040;">✏ Colar texto</button>
+      <button id="desp-tab-arquivo" onclick="despachoTab('arquivo')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;background:transparent;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;">📎 Anexar arquivo</button>
+      <button id="desp-tab-intim" onclick="despachoTab('intim')" style="padding:8px 16px;font-size:12px;font-weight:600;border:none;background:transparent;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;">🔔 Da intimação</button>
+    </div>
+
+    <!-- TAB: Colar texto -->
+    <div id="desp-panel-texto">
+      <textarea id="despacho-texto" class="fi" style="min-height:140px;font-size:12.5px;line-height:1.7;margin-bottom:10px;" placeholder="Cole aqui o texto integral do despacho, decisão ou intimação...&#10;&#10;Ex: &quot;Cite-se a parte ré para contestar no prazo de 15 dias úteis...&quot;"></textarea>
+    </div>
+
+    <!-- TAB: Anexar arquivo -->
+    <div id="desp-panel-arquivo" style="display:none;">
+      <div style="border:2px dashed rgba(154,96,96,0.25);border-radius:var(--r2);padding:20px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:10px;" onclick="document.getElementById('desp-file-inp').click()" onmouseover="this.style.borderColor='rgba(154,96,96,0.50)'" onmouseout="this.style.borderColor='rgba(154,96,96,0.25)'">
+        <div style="font-size:28px;margin-bottom:8px;">📄</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);">Clique para selecionar ou arraste o arquivo</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;">PDF, imagem (foto do despacho), .txt, .docx</div>
+        <input type="file" id="desp-file-inp" accept="image/*,application/pdf,.txt,.docx" style="display:none;" onchange="onDespachoFileLoad(event)"/>
+      </div>
+      <div id="desp-file-status" style="display:none;background:rgba(74,122,88,0.08);border:1px solid rgba(74,122,88,0.25);border-radius:var(--r);padding:10px 13px;font-size:12px;color:#4a7a58;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">📎</span>
+        <span id="desp-file-nome">arquivo.pdf</span>
+        <button onclick="removerDespachoArquivo()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--rd2);font-size:12px;">✕ Remover</button>
+      </div>
+    </div>
+
+    <!-- TAB: Da intimação -->
+    <div id="desp-panel-intim" style="display:none;">
+      <div class="alert alert-g" style="margin-bottom:10px;font-size:12px;">
+        Selecione uma intimação já cadastrada para processar o despacho automaticamente.
+      </div>
+      <select class="fi" id="desp-intim-sel" style="margin-bottom:10px;">
+        <option value="">— Selecione uma intimação recente —</option>
+      </select>
+    </div>
+
+    <!-- Caso vinculado (opcional) -->
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
+      <label style="font-size:11px;font-weight:700;color:var(--text2);white-space:nowrap;">Vincular ao caso:</label>
+      <select class="fi" id="desp-caso" style="flex:1;min-width:150px;"><option value="">— Nenhum —</option></select>
+    </div>
+
+    <button id="despacho-btn" class="btn btn-gold" style="width:100%;font-size:13.5px;padding:11px;font-weight:700;" onclick="lerDespacho()">
+      ✦ Analisar despacho com IA
+    </button>
+
+    <!-- Resultado -->
+    <div id="despacho-resultado" style="display:none;margin-top:14px;"></div>
+
+    <!-- Cumprir despacho (aparece após análise) -->
+    <div id="desp-cumprir-area" style="display:none;margin-top:12px;background:linear-gradient(135deg,rgba(154,96,96,0.08),rgba(154,96,96,0.04));border:1px solid rgba(154,96,96,0.25);border-radius:var(--r2);padding:16px;">
+      <div style="font-size:13px;font-weight:700;color:#6a2020;margin-bottom:10px;">✦ Cumprir este despacho</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">Como você quer responder ao juiz?</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-gold" style="flex:1;min-width:180px;padding:11px;font-size:13px;" onclick="cumprimDespachoAuto()">
+          🤖 Gerar resposta com IA automaticamente
+        </button>
+        <button class="btn btn-outline" style="flex:1;min-width:180px;padding:11px;font-size:13px;" onclick="cumprimDespachoManual()">
+          ✎ Abrir editor (redigir manualmente)
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- MODAL RELATÓRIO DE RISCO -->
+<div class="ov" id="modal-relatorio-risco">
+<div class="modal" style="max-width:620px;max-height:92vh;">
+  <div class="mh">
+    <div class="mt">⚡ Relatório de Risco Processual</div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-outline btn-xs" onclick="imprimirRelatorioRisco()">🖨 Imprimir</button>
+      <button class="mc" onclick="closeModal('modal-relatorio-risco')">✕</button>
+    </div>
+  </div>
+  <div class="mb" style="overflow-y:auto;">
+    <div id="risco-content" style="min-height:200px;"></div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>
+/* BODY */
+body{background-image:none;background-size:cover;background-position:center;background-attachment:fixed;background-color:#fceae6;}
+/* LOGIN */
+#login-screen{display:flex;align-items:center;justify-content:center;position:fixed;inset:0;z-index:9999;background-image:none;background-size:cover;background-position:center;overflow:hidden;}
+#login-screen::before{content:'';position:absolute;inset:0;background:rgba(238,208,198,0.18);backdrop-filter:blur(10px);z-index:0;}
+#login-screen.hide{display:none!important;}
+.login-box{position:relative;z-index:1;background:rgba(255,248,246,0.28);border:1px solid rgba(255,235,225,0.55);border-radius:24px;padding:44px 42px 38px;width:360px;box-shadow:0 8px 48px rgba(140,80,70,0.18);backdrop-filter:blur(22px);text-align:center;}
+.login-logo{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:700;color:#7a4545;margin-bottom:4px;}
+.login-sub{font-size:10px;color:#9a6060;letter-spacing:.18em;text-transform:uppercase;margin-bottom:28px;}
+.login-err{background:rgba(200,60,60,0.10);border:1px solid rgba(200,60,60,0.25);color:#aa2222;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:14px;display:none;font-weight:500;}
+.login-fg{margin-bottom:14px;text-align:left;}
+.login-fl{font-size:10px;color:#8a5050;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:5px;}
+.login-fi{width:100%;background:rgba(255,255,255,0.55);border:1px solid rgba(200,140,130,0.38);border-radius:10px;padding:10px 14px;color:#281414;font-family:'Nunito',sans-serif;font-size:13px;outline:none;backdrop-filter:blur(4px);transition:all .2s;}
+.login-fi:focus{border-color:rgba(170,100,90,0.65);background:rgba(255,255,255,0.75);box-shadow:0 0 0 3px rgba(175,105,95,0.14);}
+.login-btn{width:100%;background:linear-gradient(135deg,rgba(160,90,80,0.80),rgba(200,135,125,0.75));border:1px solid rgba(255,215,205,0.45);border-radius:10px;padding:12px;color:#fff;font-size:13.5px;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;box-shadow:0 4px 20px rgba(160,80,70,0.28);transition:all .2s;margin-top:4px;}
+.login-btn:hover{background:linear-gradient(135deg,rgba(175,105,95,0.88),rgba(210,148,138,0.82));transform:translateY(-1px);}
+.login-hint{text-align:center;font-size:11px;color:rgba(130,75,75,0.80);margin-top:14px;}
+.login-recover{text-align:center;font-size:11px;margin-top:8px;}
+.login-recover a{color:rgba(155,80,80,0.90);text-decoration:none;font-weight:600;}
+/* SHELL */
+.shell{display:grid;grid-template-columns:var(--sidebar) 1fr;grid-template-rows:var(--top) 1fr;height:100vh;position:relative;z-index:10;}
+/* TOPBAR */
+.topbar{background:linear-gradient(90deg,#c49090,#d4a8a0);border-bottom:1px solid rgba(160,80,70,0.25);box-shadow:0 2px 12px rgba(160,80,70,0.15);}
+.wordmark{background:linear-gradient(135deg,#fff,rgba(255,240,235,0.90));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+/* SIDEBAR */
+.sidebar{background:linear-gradient(180deg,#e8c8c4,#ddbcb8);border-right:1px solid rgba(160,80,70,0.20);}
+.s-item{color:rgba(80,30,30,0.75);}
+.s-item:hover{background:rgba(160,80,70,0.12);color:rgba(80,30,30,0.95);}
+.s-item.on{background:linear-gradient(135deg,rgba(160,80,70,0.22),rgba(160,80,70,0.12));color:#6a2020;border:1px solid rgba(160,80,70,0.28);font-weight:700;}
+/* CARDS/MODAIS */
+.card{background:rgba(255,248,246,0.88);border:1px solid rgba(180,100,90,0.14);}
+.card:hover{border-color:rgba(160,80,70,0.30);transform:translateY(-2px);box-shadow:0 6px 24px rgba(160,80,70,0.14);}
+.modal{background:rgba(255,248,246,0.98);border:1px solid rgba(180,100,90,0.18);}
+.mh{padding:16px 20px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:rgba(255,248,246,0.99);z-index:2;}
+.mf{padding:14px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;position:sticky;bottom:0;background:rgba(255,248,246,0.99);}
+.ov{display:none;position:fixed;inset:0;background:rgba(40,20,20,0.65);z-index:9000;align-items:center;justify-content:center;padding:14px;backdrop-filter:blur(3px);}
+.ov.open{display:flex;}
+.fi{background:rgba(255,248,246,0.92);border:1px solid rgba(180,100,90,0.18);color:#281414;border-radius:var(--r);padding:8px 11px;outline:none;transition:all .14s;width:100%;}
+.fi:focus{border-color:#9a6060;box-shadow:0 0 0 2px rgba(154,96,96,0.12);}
+.si{background:rgba(255,248,246,0.92);border:1px solid rgba(180,100,90,0.18);color:#7a4040;border-radius:var(--r);padding:7px 11px;outline:none;}
+.si:focus{border-color:#9a6060;}
+.btn-gold{background:linear-gradient(135deg,#9a6060,#b87878);border-color:transparent;color:#fff;}
+.btn-gold:hover{background:linear-gradient(135deg,#aa7070,#9a6060);}
+.btn-outline{background:transparent;border:1px solid rgba(180,100,90,0.25);color:#7a4040;}
+.btn-outline:hover{background:rgba(154,96,96,0.07);color:#281414;}
+.alert-g{background:rgba(154,96,96,0.08);border:1px solid rgba(154,96,96,0.22);color:#9a4040;}
+.alert-r{background:rgba(204,68,68,0.08);border:1px solid rgba(204,68,68,0.22);color:#aa2222;}
+.alert-b{background:rgba(88,104,170,0.08);border:1px solid rgba(88,104,170,0.22);color:#5868aa;}
+#editor-body{flex:1;background:#fff;border:1px solid rgba(180,100,90,0.15);color:#281414;border-radius:0 0 var(--r) var(--r);padding:18px 20px;font-size:13px;line-height:1.95;outline:none;overflow-y:auto;min-height:400px;font-family:'Nunito',sans-serif;}
+.pr-body{font-size:12px;color:var(--text2);line-height:1.65;}
+.sel-opt{display:flex;align-items:center;gap:7px;padding:8px 10px;border-radius:var(--r);cursor:pointer;font-size:12.5px;color:var(--text);transition:all .13s;margin-bottom:2px;border:1px solid transparent;}
+.sel-opt:hover{background:rgba(154,96,96,0.09);border-color:rgba(154,96,96,0.18);color:#6a2020;}
+#sel-popup{z-index:9500 !important;}
+.prazo-urgente{border-left:3px solid var(--rd2)!important;background:rgba(204,68,68,0.06)!important;}
+.prazo-atencao{border-left:3px solid #e0aa44!important;background:rgba(224,170,68,0.06)!important;}
+.prazo-ok{border-left:3px solid var(--gr2)!important;}
+.prazo-vencido{border-left:3px solid #888!important;opacity:0.7;}
+/* Biblioteca */
+.bib-subpasta{display:flex;align-items:center;gap:7px;padding:5px 10px 5px 28px;border-radius:4px;cursor:pointer;font-size:11px;color:var(--text2);transition:all .11s;margin-bottom:1px;}
+.bib-subpasta:hover,.bib-subpasta.on{background:rgba(154,96,96,0.08);color:#6a2020;}
+/* Agenda cal */
+#ag-cal-grid > div{min-height:90px;padding:5px;background:rgba(255,248,246,0.85);}
+#ag-cal-grid > div:hover{background:rgba(255,248,246,0.98);}
+.au-cal-event{border-radius:3px;padding:2px 5px;margin-bottom:2px;cursor:pointer;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:all .11s;}
+
+/* Prazo fatal badge */
+.fatal-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+.fatal-ok{background:rgba(74,122,88,0.12);color:#4a7a58;}
+.fatal-warn{background:rgba(224,170,68,0.12);color:#b08030;}
+.fatal-urg{background:rgba(204,68,68,0.12);color:#cc4444;}
+.fatal-venc{background:rgba(140,140,140,0.15);color:#888;text-decoration:line-through;}
+/* Andamento timeline */
+.andt-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.andt-dot{width:10px;height:10px;border-radius:50%;background:rgba(154,96,96,0.40);margin-top:4px;flex-shrink:0;}
+.andt-dot.ativo{background:#9a6060;}
+/* Notificações badge */
+.notif-dot{position:absolute;top:-2px;right:-2px;width:8px;height:8px;background:#e05555;border-radius:50%;border:1.5px solid #c49090;}
+
+/* Prazo cores */
+.prazo-passado{border-left:3px solid #aaaaaa!important;background:rgba(180,180,180,0.08)!important;opacity:0.65;}
+.prazo-passado .prazo-status-bar{background:#aaaaaa!important;}
+.prazo-hoje{border-left:3px solid var(--rd2)!important;background:rgba(204,68,68,0.06)!important;}
+.prazo-hoje .prazo-status-bar{background:var(--rd2)!important;}
+.prazo-urgente{border-left:3px solid #e07000!important;background:rgba(224,112,0,0.06)!important;}
+.prazo-urgente .prazo-status-bar{background:#e07000!important;}
+.prazo-futuro{border-left:3px solid #0070cc!important;background:rgba(0,112,204,0.05)!important;}
+.prazo-futuro .prazo-status-bar{background:#0070cc!important;}
+.prazo-concluido{border-left:3px solid #888!important;opacity:0.55;}
+.prazo-concluido .prazo-status-bar{background:#888!important;}
+<script src="script.js"></script>
+</html>
