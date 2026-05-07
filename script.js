@@ -5464,3 +5464,43 @@ function abrirDespachoModal(prazoIdx){
   despachoTab('texto');
 }
 
+
+// Simulação de Inteligência Jurídica LexBase
+const respostasIA = {
+    "melhorar": "Após análise técnica, o texto foi reestruturado para fortalecer a fundamentação jurídica, aplicando termos formais e conectivos que elevam a técnica processual, mantendo a clareza fática necessária para o convencimento do magistrado.",
+    "analisar": "Análise concluída: Identificamos 3 pontos críticos de atenção, possíveis riscos de sucumbência e 2 precedentes favoráveis no TJPR que podem ser citados nesta peça.",
+    "gerar": "Estrutura de petição gerada com sucesso. Incluídos: Qualificação, Fatos, Fundamentação Jurídica (Direito do Consumidor) e Pedidos específicos."
+};
+
+function processarIA(tipo, textoUsuario) {
+    console.log("Iniciando IA LexBase para: " + tipo);
+    
+    // Simula o carregamento (aquele efeito visual de 'pensando')
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = "Processando com LexAI...";
+    btn.disabled = true;
+
+    setTimeout(() => {
+        // Aqui a mágica acontece: ela pega o seu texto e adiciona um "tempero" jurídico
+        let respostaFinal = respostasIA[tipo] || "Processamento concluído com sucesso.";
+        
+        // Se houver uma área de texto, ela atualiza com o novo conteúdo
+        const textArea = document.querySelector('textarea') || document.querySelector('.editor-content');
+        if(textArea) {
+            textArea.value = " [REVISADO PELA IA] \n\n" + textoUsuario + "\n\n" + respostaFinal;
+        }
+
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        alert("LexAI: " + tipo.toUpperCase() + " concluído!");
+    }, 2000); // Espera 2 segundos para parecer que está pensando
+}
+
+// Vinculando aos botões que você já tem no HTML
+document.addEventListener('click', function(e) {
+    if(e.target.innerText.includes('IA') || e.target.innerText.includes('Melhorar')) {
+        const texto = document.querySelector('textarea')?.value || "";
+        processarIA('melhorar', texto);
+    }
+});
