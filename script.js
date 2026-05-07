@@ -5533,3 +5533,25 @@ async function acaoIA(tipo) {
         areaTexto.innerText = resultado;
     }
 }
+
+
+// FORÇAR LIGAÇÃO DA IA NOS BOTÕES
+document.addEventListener('click', function(e) {
+    // Verifica se o elemento clicado é um botão ou está dentro de um
+    const botao = e.target.closest('button');
+    
+    if (botao) {
+        const textoBotao = botao.innerText.toUpperCase();
+        
+        // Se no botão estiver escrito "IA" ou "MELHORAR"
+        if (textoBotao.includes('IA') || textoBotao.includes('MELHORAR')) {
+            console.log("Botão de IA detectado!");
+            acaoIA('melhorar');
+        } 
+        // Se no botão estiver escrito "ANALISAR"
+        else if (textoBotao.includes('ANALISAR')) {
+            console.log("Botão de Análise detectado!");
+            acaoIA('analisar');
+        }
+    }
+});
