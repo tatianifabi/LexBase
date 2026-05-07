@@ -5480,28 +5480,56 @@ async function chamarGemini(promptUsuario) {
     try {
         const response = await fetch(url, {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(corpo)
         });
+
         const data = await response.json();
+        
+        // Se o Google devolver erro, ele avisa aqui
+        if (data.error) {
+            console.error("Erro detalhado do Google:", data.error.message);
+            return "Erro na Chave: Verifique se a chave API está ativa no Google Cloud.";
+        }
+
         return data.candidates[0].content.parts[0].text;
     } catch (error) {
         console.error("Erro na IA:", error);
-        return "Desculpe, tive um problema ao processar. Verifique sua conexão ou chave de API.";
+        return "Erro de conexão. Verifique o console (F12).";
     }
 }
 
 // Função para os botões do LexBase
 async function acaoIA(tipo) {
+    // Tenta encontrar a área de texto ou o editor
     const areaTexto = document.querySelector('textarea') || document.querySelector('.editor-content');
-    if (!areaTexto) return;
+    
+    if (!areaTexto) {
+        alert("Área de texto não encontrada!");
+        return;
+    }
 
     const textoOriginal = areaTexto.value || areaTexto.innerText;
+    
+    if (!textoOriginal || textoOriginal.trim() === "") {
+        alert("Por favor, digite um texto para a IA analisar.");
+        return;
+    }
+
     areaTexto.value = "LexBase IA está processando sua solicitação...";
 
     const promptFinal = tipo === 'melhorar' 
         ? `Melhore este texto jurídico, tornando-o mais técnico e formal: ${textoOriginal}`
-        : `Analise este caso e sugira fundamentação legal: ${textoOriginal}`;
+        : `Analise este caso e sugira fundamentação legal para uma petição: ${textoOriginal}`;
 
     const resultado = await chamarGemini(promptFinal);
-    areaTexto.value = resultado;
+    
+    // Atualiza o campo com a resposta
+    if (areaTexto.tagName === 'TEXTAREA') {
+        areaTexto.value = resultado;
+    } else {
+        areaTexto.innerText = resultado;
+    }
 }
