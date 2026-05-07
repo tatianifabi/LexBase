@@ -5465,42 +5465,43 @@ function abrirDespachoModal(prazoIdx){
 }
 
 
-// Simulação de Inteligência Jurídica LexBase
-const respostasIA = {
-    "melhorar": "Após análise técnica, o texto foi reestruturado para fortalecer a fundamentação jurídica, aplicando termos formais e conectivos que elevam a técnica processual, mantendo a clareza fática necessária para o convencimento do magistrado.",
-    "analisar": "Análise concluída: Identificamos 3 pontos críticos de atenção, possíveis riscos de sucumbência e 2 precedentes favoráveis no TJPR que podem ser citados nesta peça.",
-    "gerar": "Estrutura de petição gerada com sucesso. Incluídos: Qualificação, Fatos, Fundamentação Jurídica (Direito do Consumidor) e Pedidos específicos."
-};
+// Configuração da Integração com Gemini
+const GEMINI_API_KEY = "AIzaSyDQUJeqwqnoGdX4dQxTqC_J_Bf46bBIhj4";
 
-function processarIA(tipo, textoUsuario) {
-    console.log("Iniciando IA LexBase para: " + tipo);
+async function chamarGemini(promptUsuario) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
     
-    // Simula o carregamento (aquele efeito visual de 'pensando')
-    const btn = event.target;
-    const originalText = btn.innerHTML;
-    btn.innerHTML = "Processando com LexAI...";
-    btn.disabled = true;
+    const corpo = {
+        contents: [{
+            parts: [{ text: "Você é um assistente jurídico sênior do sistema LexBase. Ajude a redigir ou analisar este texto de forma profissional: " + promptUsuario }]
+        }]
+    };
 
-    setTimeout(() => {
-        // Aqui a mágica acontece: ela pega o seu texto e adiciona um "tempero" jurídico
-        let respostaFinal = respostasIA[tipo] || "Processamento concluído com sucesso.";
-        
-        // Se houver uma área de texto, ela atualiza com o novo conteúdo
-        const textArea = document.querySelector('textarea') || document.querySelector('.editor-content');
-        if(textArea) {
-            textArea.value = " [REVISADO PELA IA] \n\n" + textoUsuario + "\n\n" + respostaFinal;
-        }
-
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-        alert("LexAI: " + tipo.toUpperCase() + " concluído!");
-    }, 2000); // Espera 2 segundos para parecer que está pensando
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            body: JSON.stringify(corpo)
+        });
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
+    } catch (error) {
+        console.error("Erro na IA:", error);
+        return "Desculpe, tive um problema ao processar. Verifique sua conexão ou chave de API.";
+    }
 }
 
-// Vinculando aos botões que você já tem no HTML
-document.addEventListener('click', function(e) {
-    if(e.target.innerText.includes('IA') || e.target.innerText.includes('Melhorar')) {
-        const texto = document.querySelector('textarea')?.value || "";
-        processarIA('melhorar', texto);
-    }
-});
+// Função para os botões do LexBase
+async function acaoIA(tipo) {
+    const areaTexto = document.querySelector('textarea') || document.querySelector('.editor-content');
+    if (!areaTexto) return;
+
+    const textoOriginal = areaTexto.value || areaTexto.innerText;
+    areaTexto.value = "LexBase IA está processando sua solicitação...";
+
+    const promptFinal = tipo === 'melhorar' 
+        ? `Melhore este texto jurídico, tornando-o mais técnico e formal: ${textoOriginal}`
+        : `Analise este caso e sugira fundamentação legal: ${textoOriginal}`;
+
+    const resultado = await chamarGemini(promptFinal);
+    areaTexto.value = resultado;
+}
